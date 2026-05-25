@@ -1,0 +1,357 @@
+<Window x:Class="CaravanCMS.Client.Views.CaravanDetailWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:CaravanCMS.Client.Views"
+        xmlns:scm="clr-namespace:System.ComponentModel;assembly=WindowsBase"
+        Title="Caravan History"
+        Height="780" Width="1050"
+        MinHeight="600" MinWidth="800"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource AppBackground}">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <local:NullToVisibilityConverter x:Key="NullToVis"/>
+        <local:MimeTypeToIconConverter x:Key="MimeToIcon"/>
+        <local:ZeroToVisibilityConverter x:Key="ZeroToVis"/>
+        <CollectionViewSource x:Key="GroupedDocs" Source="{Binding Documents}">
+            <CollectionViewSource.GroupDescriptions>
+                <PropertyGroupDescription PropertyName="DocumentType"/>
+            </CollectionViewSource.GroupDescriptions>
+            <CollectionViewSource.SortDescriptions>
+                <scm:SortDescription PropertyName="DocumentType"/>
+                <scm:SortDescription PropertyName="Category"/>
+            </CollectionViewSource.SortDescriptions>
+        </CollectionViewSource>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="32"/>
+        </Grid.RowDefinitions>
+
+        <!-- ── Header band ─────────────────────────────────────────────────── -->
+        <Border Grid.Row="0" Background="{StaticResource DeepPink}" Padding="24,14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock FontFamily="Segoe UI" FontSize="20" FontWeight="Bold" Foreground="White">
+                        <Run Text="{Binding Caravan.Year, FallbackValue=''}"/>
+                        <Run Text=" "/>
+                        <Run Text="{Binding Caravan.Make, FallbackValue=''}"/>
+                        <Run Text=" "/>
+                        <Run Text="{Binding Caravan.Model, FallbackValue='Caravan Detail'}"/>
+                    </TextBlock>
+                    <TextBlock FontFamily="Segoe UI" FontSize="12" Foreground="#FFDDEE">
+                        <Run Text="Rego: "/>
+                        <Run Text="{Binding Caravan.RegistrationNumber, FallbackValue='—'}"/>
+                        <Run Text="   VIN: "/>
+                        <Run Text="{Binding Caravan.Vin, FallbackValue='—'}"/>
+                    </TextBlock>
+                </StackPanel>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Caravan.Customer.Name, FallbackValue=''}"
+                               FontFamily="Segoe UI" FontSize="14" FontWeight="SemiBold"
+                               Foreground="White" HorizontalAlignment="Right"/>
+                    <TextBlock Text="{Binding Caravan.Customer.Phone, FallbackValue=''}"
+                               FontFamily="Segoe UI" FontSize="12" Foreground="#FFDDEE"
+                               HorizontalAlignment="Right"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ── Tab content ─────────────────────────────────────────────────── -->
+        <TabControl Grid.Row="1" Style="{StaticResource PinkTabControl}" Margin="20,12,20,0">
+
+            <!-- Info tab -->
+            <TabItem Header="  Vehicle Info  " Style="{StaticResource PinkTabItem}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,12,0,0">
+                    <Border Style="{StaticResource Card}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Vehicle details -->
+                            <StackPanel>
+                                <TextBlock Text="Vehicle Details" Style="{StaticResource HeadingMedium}" Margin="0,0,0,12"/>
+                                <StackPanel>
+                                    <local:InfoRow Label="Make" Value="{Binding Caravan.Make}"/>
+                                    <local:InfoRow Label="Model" Value="{Binding Caravan.Model}"/>
+                                    <local:InfoRow Label="Year" Value="{Binding Caravan.Year}"/>
+                                    <local:InfoRow Label="Body Type" Value="{Binding Caravan.Body}"/>
+                                    <local:InfoRow Label="VIN / Chassis" Value="{Binding Caravan.Vin}"/>
+                                    <local:InfoRow Label="Registration" Value="{Binding Caravan.RegistrationNumber}"/>
+                                    <local:InfoRow Label="Odometer"
+                                                   Value="{Binding Caravan.CurrentOdometer, StringFormat='{}{0:N0} km'}"/>
+                                    <local:InfoRow Label="Last Serviced"
+                                                   Value="{Binding Caravan.LastJobDate, StringFormat='dd MMM yyyy'}"/>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- Owner details -->
+                            <StackPanel Grid.Column="1" Margin="24,0,0,0">
+                                <TextBlock Text="Owner Details" Style="{StaticResource HeadingMedium}" Margin="0,0,0,12"/>
+                                <StackPanel>
+                                    <local:InfoRow Label="Name" Value="{Binding Caravan.Customer.Name}"/>
+                                    <local:InfoRow Label="Email" Value="{Binding Caravan.Customer.Email}"/>
+                                    <local:InfoRow Label="Phone" Value="{Binding Caravan.Customer.Phone}"/>
+                                    <local:InfoRow Label="Mobile" Value="{Binding Caravan.Customer.Mobile}"/>
+                                    <local:InfoRow Label="Address" Value="{Binding Caravan.Customer.Address}"/>
+                                    <local:InfoRow Label="Suburb" Value="{Binding Caravan.Customer.Suburb}"/>
+                                    <local:InfoRow Label="State" Value="{Binding Caravan.Customer.State}"/>
+                                    <local:InfoRow Label="Postcode" Value="{Binding Caravan.Customer.Postcode}"/>
+                                    <local:InfoRow Label="Customer #" Value="{Binding Caravan.Customer.CustomerNumber}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Job History tab -->
+            <TabItem Style="{StaticResource PinkTabItem}">
+                <TabItem.Header>
+                    <TextBlock>
+                        <Run Text="  Job History  "/>
+                        <Run Text="{Binding Jobs.Count, StringFormat='({0})', Mode=OneWay}"
+                             Foreground="{StaticResource TextSecondary}" FontSize="11"/>
+                    </TextBlock>
+                </TabItem.Header>
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,12,0,0">
+                    <ItemsControl ItemsSource="{Binding Jobs}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,0,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="16"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Timeline dot -->
+                                    <Ellipse Width="12" Height="12" Fill="{StaticResource PrimaryPink}"
+                                             VerticalAlignment="Top" Margin="2,8,0,0"/>
+
+                                    <!-- Job card -->
+                                    <Border Grid.Column="1" Style="{StaticResource Card}" Margin="12,0,0,0">
+                                        <StackPanel>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Style="{StaticResource HeadingMedium}">
+                                                        <Run Text="Job #"/>
+                                                        <Run Text="{Binding JobNumber}"/>
+                                                    </TextBlock>
+                                                    <TextBlock Style="{StaticResource SubText}" Margin="0,2,0,0">
+                                                        <Run Text="{Binding JobType}"/>
+                                                        <Run Text=" · Completed "/>
+                                                        <Run Text="{Binding FinishDate, StringFormat='dd MMM yyyy'}"/>
+                                                        <Run Text=" · By "/>
+                                                        <Run Text="{Binding FinishedBy}"/>
+                                                    </TextBlock>
+                                                </StackPanel>
+                                                <!-- Status badge -->
+                                                <Border Grid.Column="1" CornerRadius="10" Padding="10,4"
+                                                        Background="#E0F0E8" VerticalAlignment="Top">
+                                                    <TextBlock Text="{Binding Status}" FontSize="11" FontWeight="SemiBold"
+                                                               Foreground="{StaticResource SuccessBrush}"/>
+                                                </Border>
+                                            </Grid>
+
+                                            <TextBlock Text="{Binding Description}" Style="{StaticResource BodyText}"
+                                                       TextWrapping="Wrap" Margin="0,8,0,0"
+                                                       Visibility="{Binding Description, Converter={StaticResource NullToVis}}"/>
+
+                                            <TextBlock Text="{Binding Notes}" Style="{StaticResource SubText}"
+                                                       TextWrapping="Wrap" Margin="0,4,0,0" FontStyle="Italic"
+                                                       Visibility="{Binding Notes, Converter={StaticResource NullToVis}}"/>
+
+                                            <!-- Invoices for this job -->
+                                            <ItemsControl ItemsSource="{Binding Invoices}" Margin="0,8,0,0">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border BorderBrush="{StaticResource BorderPink}"
+                                                                BorderThickness="0,1,0,0" Padding="0,8,0,0" Margin="0,4,0,0">
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="Auto"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <StackPanel>
+                                                                    <TextBlock Style="{StaticResource BodyText}">
+                                                                        <Run Text="Invoice #" FontWeight="SemiBold"/>
+                                                                        <Run Text="{Binding InvoiceNumber}" FontWeight="SemiBold"/>
+                                                                        <Run Text="  "/>
+                                                                        <Run Text="{Binding IssueDate, StringFormat='dd MMM yyyy'}"
+                                                                             Foreground="{StaticResource TextSecondary}"/>
+                                                                    </TextBlock>
+                                                                    <!-- Line items -->
+                                                                    <ItemsControl ItemsSource="{Binding Items}" Margin="0,6,0,0">
+                                                                        <ItemsControl.ItemTemplate>
+                                                                            <DataTemplate>
+                                                                                <Grid Margin="0,2">
+                                                                                    <Grid.ColumnDefinitions>
+                                                                                        <ColumnDefinition Width="*"/>
+                                                                                        <ColumnDefinition Width="50"/>
+                                                                                        <ColumnDefinition Width="80"/>
+                                                                                    </Grid.ColumnDefinitions>
+                                                                                    <TextBlock Text="{Binding Description}"
+                                                                                               Style="{StaticResource SubText}"/>
+                                                                                    <TextBlock Grid.Column="1" Style="{StaticResource SubText}"
+                                                                                               Text="{Binding Quantity}"
+                                                                                               HorizontalAlignment="Center"/>
+                                                                                    <TextBlock Grid.Column="2" Style="{StaticResource SubText}"
+                                                                                               Text="{Binding NetAmount, StringFormat='${0:N2}'}"
+                                                                                               HorizontalAlignment="Right"/>
+                                                                                </Grid>
+                                                                            </DataTemplate>
+                                                                        </ItemsControl.ItemTemplate>
+                                                                    </ItemsControl>
+                                                                </StackPanel>
+                                                                <StackPanel Grid.Column="1" HorizontalAlignment="Right" Margin="16,0,0,0">
+                                                                    <TextBlock Text="{Binding TotalAmount, StringFormat='${0:N2}'}"
+                                                                               FontSize="18" FontWeight="Bold"
+                                                                               Foreground="{StaticResource DeepPink}"
+                                                                               HorizontalAlignment="Right"/>
+                                                                    <TextBlock Text="{Binding Status}"
+                                                                               Style="{StaticResource SubText}"
+                                                                               HorizontalAlignment="Right"/>
+                                                                </StackPanel>
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Documents tab -->
+            <TabItem Style="{StaticResource PinkTabItem}">
+                <TabItem.Header>
+                    <TextBlock>
+                        <Run Text="  Documents  "/>
+                        <Run Text="{Binding Documents.Count, StringFormat='({0})', Mode=OneWay}"
+                             Foreground="{StaticResource TextSecondary}" FontSize="11"/>
+                    </TextBlock>
+                </TabItem.Header>
+
+                <Grid Margin="0,12,0,0">
+                    <TextBlock Text="No documents linked to this caravan."
+                               Style="{StaticResource SubText}" HorizontalAlignment="Center"
+                               VerticalAlignment="Center" FontSize="14"
+                               Visibility="{Binding Documents.Count, Converter={StaticResource ZeroToVis}}"/>
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding Source={StaticResource GroupedDocs}}">
+                            <ItemsControl.GroupStyle>
+                                <GroupStyle>
+                                    <GroupStyle.HeaderTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Name}"
+                                                       Foreground="{StaticResource DeepPink}"
+                                                       FontSize="13" FontWeight="SemiBold"
+                                                       Margin="0,16,0,4"/>
+                                        </DataTemplate>
+                                    </GroupStyle.HeaderTemplate>
+                                </GroupStyle>
+                            </ItemsControl.GroupStyle>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource Card}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Thumbnail / placeholder -->
+                                            <Border Width="150" Height="110"
+                                                    Background="{StaticResource LightPink}"
+                                                    BorderBrush="{StaticResource BorderPink}" BorderThickness="1"
+                                                    CornerRadius="4" Margin="0,0,14,0" VerticalAlignment="Center"
+                                                    ClipToBounds="True">
+                                                <Grid>
+                                                    <!-- Real thumbnail (images and PDFs) -->
+                                                    <Image Source="{Binding ThumbnailSource}"
+                                                           Stretch="UniformToFill"
+                                                           Visibility="{Binding HasThumbnail,
+                                                               Converter={StaticResource BoolToVis}}"/>
+                                                    <!-- Emoji placeholder while not yet loaded -->
+                                                    <TextBlock Text="{Binding MimeType, Converter={StaticResource MimeToIcon}}"
+                                                               FontSize="38"
+                                                               HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding HasThumbnail}" Value="True">
+                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </Grid>
+                                            </Border>
+
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding FileName}"
+                                                           Style="{StaticResource BodyText}" FontWeight="SemiBold"/>
+                                                <TextBlock Style="{StaticResource SubText}" Margin="0,3,0,0">
+                                                    <Run Text="{Binding Category, Mode=OneWay}"/>
+                                                    <Run Text=" · Added "/>
+                                                    <Run Text="{Binding UploadedDate, StringFormat='dd MMM yyyy', Mode=OneWay}"/>
+                                                </TextBlock>
+                                                <TextBlock Text="{Binding Notes}" Style="{StaticResource SubText}"
+                                                           FontStyle="Italic"
+                                                           Visibility="{Binding Notes, Converter={StaticResource NullToVis}}"/>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="2" VerticalAlignment="Center"
+                                                        Orientation="Horizontal">
+                                                <Button Style="{StaticResource SecondaryButton}"
+                                                        Content="👁  View" Margin="0,0,8,0"
+                                                        Command="{Binding DataContext.ViewDocumentCommand,
+                                                            RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding}"/>
+                                                <Button Style="{StaticResource PrimaryButton}"
+                                                        Content="⬇  Save"
+                                                        Command="{Binding DataContext.SaveDocumentCommand,
+                                                            RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding}"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <!-- Status bar -->
+        <Border Grid.Row="2" Background="{StaticResource LightPink}"
+                BorderBrush="{StaticResource BorderPink}" BorderThickness="0,1,0,0">
+            <TextBlock Text="{Binding StatusText}" Style="{StaticResource SubText}"
+                       Margin="16,0" VerticalAlignment="Center"/>
+        </Border>
+    </Grid>
+</Window>

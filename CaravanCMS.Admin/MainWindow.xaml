@@ -1,0 +1,190 @@
+<Window x:Class="CaravanCMS.Admin.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:CaravanCMS.Admin"
+        Icon="Resources/admin.ico"
+        Title="CaravanCMS — Admin Dashboard"
+        Height="720" Width="980"
+        MinHeight="600" MinWidth="800"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource AppBackground}">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <local:BoolToColorConverter x:Key="BoolToColor"/>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="70"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="36"/>
+        </Grid.RowDefinitions>
+
+        <!-- ── Header ──────────────────────────────────────────────────────── -->
+        <Border Grid.Row="0" Background="{StaticResource DeepPink}">
+            <Grid Margin="24,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="CaravanCMS" FontFamily="Segoe UI" FontSize="24"
+                               FontWeight="Bold" Foreground="White"/>
+                    <TextBlock Text="Caravanland Admin Dashboard" FontFamily="Segoe UI"
+                               FontSize="11" Foreground="#FFDDEE" Margin="1,2,0,0"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Style="{StaticResource SecondaryButton}"
+                            Content="{Binding ApiProcessLabel}"
+                            Command="{Binding ToggleApiCommand}"
+                            Margin="0,0,8,0" Foreground="White" BorderBrush="#FFFFFF80" MinWidth="90"/>
+                    <Button Style="{StaticResource SecondaryButton}" Content="⟳  Refresh"
+                            Command="{Binding RefreshStatsCommand}" Margin="0,0,8,0"
+                            Foreground="White" BorderBrush="#FFFFFF80"/>
+                    <Button Style="{StaticResource SecondaryButton}" Content="⚙  Settings"
+                            Click="Settings_Click"
+                            Foreground="White" BorderBrush="#FFFFFF80"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ── Content ─────────────────────────────────────────────────────── -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="24,20">
+
+                <!-- Stats row -->
+                <TextBlock Text="Overview" Style="{StaticResource HeadingMedium}" Margin="0,0,0,12"/>
+                <UniformGrid Rows="1" Columns="4" Margin="0,0,0,20">
+                    <Border Style="{StaticResource Card}" Margin="0,0,10,0">
+                        <StackPanel>
+                            <TextBlock Text="Caravans" Style="{StaticResource SubText}"/>
+                            <TextBlock Text="{Binding TotalCaravans}" FontSize="32"
+                                       FontWeight="Bold" Foreground="{StaticResource DeepPink}"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource Card}" Margin="0,0,10,0">
+                        <StackPanel>
+                            <TextBlock Text="Customers" Style="{StaticResource SubText}"/>
+                            <TextBlock Text="{Binding TotalCustomers}" FontSize="32"
+                                       FontWeight="Bold" Foreground="{StaticResource DeepPink}"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource Card}" Margin="0,0,10,0">
+                        <StackPanel>
+                            <TextBlock Text="Jobs" Style="{StaticResource SubText}"/>
+                            <TextBlock Text="{Binding TotalJobs}" FontSize="32"
+                                       FontWeight="Bold" Foreground="{StaticResource DeepPink}"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="Documents" Style="{StaticResource SubText}"/>
+                            <TextBlock Text="{Binding TotalDocuments}" FontSize="32"
+                                       FontWeight="Bold" Foreground="{StaticResource DeepPink}"/>
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+
+                <!-- Import card -->
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                            <TextBlock Text="📥" FontSize="22" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                            <StackPanel>
+                                <TextBlock Text="Import MechanicDesk Data" Style="{StaticResource HeadingMedium}"/>
+                                <TextBlock Text="Upload an Excel export to sync customers, caravans, jobs, and invoices."
+                                           Style="{StaticResource SubText}"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <Separator Background="{StaticResource BorderPink}" Height="1" Margin="0,0,0,12"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Style="{StaticResource PrimaryButton}"
+                                    Content="Browse &amp; Import Excel File"
+                                    Click="ImportMechanicDesk_Click" MinWidth="200" Margin="0,0,16,0"/>
+                            <TextBlock Style="{StaticResource SubText}" VerticalAlignment="Center">
+                                <Run Text="Last import: "/>
+                                <Run Text="{Binding LastImportTime}" FontWeight="SemiBold"/>
+                            </TextBlock>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Scan documents card -->
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                            <TextBlock Text="🗂" FontSize="22" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                            <StackPanel>
+                                <TextBlock Text="Scan &amp; Link Documents" Style="{StaticResource HeadingMedium}"/>
+                                <TextBlock Text="Scan the Caravan History folder and link PDFs and images to caravan records."
+                                           Style="{StaticResource SubText}"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <Separator Background="{StaticResource BorderPink}" Height="1" Margin="0,0,0,12"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Style="{StaticResource PrimaryButton}"
+                                    Content="Scan Caravan History Folder"
+                                    Click="ScanFiles_Click" MinWidth="200" Margin="0,0,16,0"/>
+                            <TextBlock Style="{StaticResource SubText}" VerticalAlignment="Center">
+                                <Run Text="{Binding TotalDocuments}"/>
+                                <Run Text=" documents currently linked"/>
+                            </TextBlock>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Database info -->
+                <Border Style="{StaticResource Card}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Database &amp; Connection" Style="{StaticResource HeadingMedium}" Margin="0,0,0,4"/>
+                            <TextBlock Style="{StaticResource SubText}">
+                                <Run Text="Database size: "/>
+                                <Run Text="{Binding DatabaseSize}" FontWeight="SemiBold"/>
+                                <Run Text="   ·   Endpoint: "/>
+                                <Run Text="{Binding ApiUrl}" FontWeight="SemiBold"/>
+                            </TextBlock>
+                        </StackPanel>
+                        <Button Grid.Column="1" Style="{StaticResource SecondaryButton}"
+                                Content="Test Connection" VerticalAlignment="Center"
+                                Command="{Binding TestConnectionCommand}"/>
+                    </Grid>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- ── Status bar ──────────────────────────────────────────────────── -->
+        <Border Grid.Row="2" Background="{StaticResource LightPink}"
+                BorderBrush="{StaticResource BorderPink}" BorderThickness="0,1,0,0">
+            <Grid Margin="14,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Ellipse Width="9" Height="9" Margin="0,0,6,0" VerticalAlignment="Center">
+                        <Ellipse.Fill>
+                            <SolidColorBrush Color="{Binding IsConnected, Converter={StaticResource BoolToColor}}"/>
+                        </Ellipse.Fill>
+                    </Ellipse>
+                    <TextBlock Text="{Binding ConnectionStatus}" Style="{StaticResource SubText}" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <TextBlock Grid.Column="1" Text="{Binding StatusMessage}" Style="{StaticResource SubText}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+                <TextBlock Grid.Column="2" Text="Caravanland © 2024" Style="{StaticResource SubText}" VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

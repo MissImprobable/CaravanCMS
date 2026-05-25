@@ -1,0 +1,45 @@
+# Build output
+bin/
+obj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+!**/packages/build/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# SQLite databases (runtime data, not source)
+*.db
+*.db-shm
+*.db-wal
+
+# Serilog / application logs
+logs/
+*.log
+
+# Local settings (machine-specific, may contain secrets)
+appsettings.*.local.json
+secrets.json
+*.local.json
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Rider / JetBrains
+.idea/
+*.sln.iml
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store

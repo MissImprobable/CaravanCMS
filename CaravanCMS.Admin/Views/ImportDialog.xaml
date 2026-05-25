@@ -1,0 +1,133 @@
+<Window x:Class="CaravanCMS.Admin.Views.ImportDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:CaravanCMS.Admin.Views"
+        Title="Import MechanicDesk Data"
+        Height="620" Width="700"
+        MinHeight="500"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource AppBackground}">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <local:BoolToSuccessColorConverter x:Key="BoolToSuccessColor"/>
+        <local:CountToVisibilityConverter x:Key="CountToVis"/>
+        <local:InverseBoolConverter x:Key="InverseBool"/>
+        <local:StringJoinConverter x:Key="StringJoin"/>
+    </Window.Resources>
+
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Margin="0,0,0,16">
+            <TextBlock Text="Import MechanicDesk Data" Style="{StaticResource HeadingLarge}"/>
+            <TextBlock Text="Select an Excel export file from MechanicDesk. Existing records will be detected automatically."
+                       Style="{StaticResource SubText}" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <!-- File picker + progress -->
+        <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0">
+            <StackPanel>
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border BorderBrush="{StaticResource BorderPink}" BorderThickness="1.5"
+                            CornerRadius="6" Padding="10,8" Background="White">
+                        <TextBlock Text="{Binding SelectedFileName, FallbackValue='No file selected'}"
+                                   Style="{StaticResource BodyText}" VerticalAlignment="Center"/>
+                    </Border>
+
+                    <Button Grid.Column="1" Style="{StaticResource SecondaryButton}"
+                            Content="Browse..." Margin="8,0,0,0"
+                            Command="{Binding BrowseFileCommand}"/>
+                </Grid>
+
+                <ProgressBar Style="{StaticResource PinkProgress}" Margin="0,0,0,8"
+                             IsIndeterminate="{Binding IsImporting}"
+                             Visibility="{Binding IsImporting, Converter={StaticResource BoolToVis}}"/>
+
+                <TextBlock Text="{Binding ProgressText}" Style="{StaticResource SubText}"
+                           TextWrapping="Wrap" Margin="0,0,0,10"/>
+
+                <Button Style="{StaticResource PrimaryButton}" Content="▶  Start Import"
+                        Command="{Binding StartImportCommand}"
+                        HorizontalAlignment="Left" MinWidth="160"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Results area -->
+        <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0"
+                Visibility="{Binding HasResult, Converter={StaticResource BoolToVis}}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+
+                    <!-- Summary banner -->
+                    <Border CornerRadius="6" Padding="12,8" Margin="0,0,0,10">
+                        <Border.Background>
+                            <SolidColorBrush Color="{Binding ImportSucceeded, Converter={StaticResource BoolToSuccessColor}}"/>
+                        </Border.Background>
+                        <TextBlock Text="{Binding ResultSummary}" Style="{StaticResource BodyText}"
+                                   FontWeight="SemiBold" TextWrapping="Wrap"/>
+                    </Border>
+
+                    <!-- Conflicts -->
+                    <StackPanel Visibility="{Binding HasConflicts, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="⚠  Conflicts Detected" Style="{StaticResource HeadingMedium}"
+                                   Foreground="{StaticResource WarningBrush}" Margin="0,4,0,8"/>
+                        <TextBlock Text="These records differ from existing data. Re-import to update, or they'll remain unchanged."
+                                   Style="{StaticResource SubText}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+
+                        <DataGrid ItemsSource="{Binding Conflicts}" Style="{StaticResource PinkDataGrid}"
+                                  MaxHeight="200" ColumnHeaderStyle="{StaticResource PinkDataGridColumnHeader}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Type" Binding="{Binding EntityType}" Width="80"/>
+                                <DataGridTextColumn Header="Existing" Binding="{Binding ExistingDescription}" Width="*"/>
+                                <DataGridTextColumn Header="Incoming" Binding="{Binding IncomingDescription}" Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </StackPanel>
+
+                    <!-- Warnings -->
+                    <StackPanel Margin="0,8,0,0"
+                                Visibility="{Binding Warnings.Count, Converter={StaticResource CountToVis}}">
+                        <TextBlock Text="Warnings / Diagnostics" Style="{StaticResource HeadingMedium}"
+                                   Foreground="{StaticResource WarningBrush}" Margin="0,0,0,8"/>
+                        <TextBox Text="{Binding WarningsText, Mode=OneWay}"
+                                 IsReadOnly="True" TextWrapping="Wrap"
+                                 FontFamily="Segoe UI" FontSize="12"
+                                 Foreground="{StaticResource WarningBrush}"
+                                 Background="Transparent" BorderThickness="0"
+                                 Padding="0" Margin="0,2"/>
+                    </StackPanel>
+
+                    <!-- Errors -->
+                    <StackPanel Margin="0,8,0,0"
+                                Visibility="{Binding Errors.Count, Converter={StaticResource CountToVis}}">
+                        <TextBlock Text="Errors" Style="{StaticResource HeadingMedium}"
+                                   Foreground="{StaticResource ErrorBrush}" Margin="0,0,0,8"/>
+                        <TextBox Text="{Binding ErrorsText, Mode=OneWay}"
+                                 IsReadOnly="True" TextWrapping="Wrap"
+                                 FontFamily="Segoe UI" FontSize="12"
+                                 Foreground="{StaticResource ErrorBrush}"
+                                 Background="Transparent" BorderThickness="0"
+                                 Padding="0" Margin="0,2"/>
+                    </StackPanel>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Close -->
+        <Button Grid.Row="3" Style="{StaticResource SecondaryButton}" Content="Close"
+                HorizontalAlignment="Right" Margin="0,12,0,0" IsCancel="True" Click="Close_Click"/>
+    </Grid>
+</Window>
