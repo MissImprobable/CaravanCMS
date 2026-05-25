@@ -6,7 +6,7 @@ Caravan service history management system for Caravanland. Centralises MechanicD
 
 ```
 CaravanCMS.Core        → Shared models and DTOs (no dependencies)
-CaravanCMS.Api         → ASP.NET Core 9 REST API + SQLite database
+CaravanCMS.Api         → ASP.NET Core 10 REST API + SQLite database (runs as a Windows tray app)
 CaravanCMS.Admin       → WPF app for importing and file scanning (server machine)
 CaravanCMS.Client      → WPF app for viewing caravan history (all machines)
 ```
@@ -15,9 +15,9 @@ All apps communicate with the API over HTTP. The API is the single source of tru
 
 ## Prerequisites
 
-- .NET 9 SDK: https://dotnet.microsoft.com/download/dotnet/9
-- Visual Studio 2022 v17.8+ (or VS Code with C# extension)
-- Windows 10/11 (WPF apps are Windows-only)
+- .NET 10 SDK: https://dotnet.microsoft.com/download/dotnet/10
+- Visual Studio 2022 v17.12+ (or VS Code with C# extension)
+- Windows 10/11 (all projects are Windows-only)
 
 ## Quick Setup
 
@@ -28,11 +28,13 @@ dotnet restore
 # 2. Start the API (creates caravan-cms.db automatically)
 cd CaravanCMS.Api
 dotnet run
-
-# 3. Verify at http://localhost:5000/swagger
 ```
 
-The database file `caravan-cms.db` is created automatically in the API's working directory on first run.
+The API launches as a **Windows system tray application**. A tray icon appears in the notification area with a context menu to open Swagger UI, stop/start the API, or exit. Double-clicking the tray icon opens Swagger.
+
+The database file `caravan-cms.db` is created automatically in the API's working directory on first run. New columns added in later versions are applied automatically on startup without needing a migration.
+
+Verify the API is running at `http://localhost:5000/swagger`.
 
 ## Configuration
 
@@ -68,19 +70,20 @@ Returns `401 Unauthorized` if missing or incorrect. Swagger UI is excluded from 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/caravans` | All caravans (summary) |
-| GET | `/api/caravans/{id}` | Full detail with history |
-| GET | `/api/caravans/search?q=term` | Fuzzy search |
+| GET | `/api/caravans/{rego}` | Full detail with history (keyed by registration number) |
+| GET | `/api/caravans/search?q=term` | Search by VIN, rego, make/model, or customer name |
 | GET | `/api/caravans/stats` | Dashboard stats |
-| POST | `/api/import/mechanicdesk` | Upload MechanicDesk Excel |
+| POST | `/api/import/mechanicdesk` | Upload MechanicDesk Excel (.xlsx only) |
 | POST | `/api/import/scan-files` | Scan folder for documents |
 | POST | `/api/import/link-document` | Link file to caravan |
 | GET | `/api/documents/{id}/download` | Stream file to client |
+| GET | `/health` | Health check (unauthenticated) |
 
 Full documentation at `http://localhost:5000/swagger`.
 
 ## MechanicDesk Import
 
-The importer reads the first sheet (or one named "Jobs") and auto-detects column names. It handles:
+The importer reads the first sheet (or one named "Jobs") and auto-detects column names. Only `.xlsx` files are accepted — re-save `.xls` files from Excel first. It handles:
 
 - **Deduplication:** Uses `MechanicDeskId` to safely re-import the same file multiple times without duplicating data
 - **Conflicts:** Records where existing data differs from the import are flagged for review
@@ -111,9 +114,11 @@ Logs are written to:
 
 EF Core SQL queries are logged at Debug level (Development only).
 
-## Database Migrations
+## Database Schema Changes
 
-The database is created automatically via `EnsureCreated()` on first run. To add migrations for schema changes later:
+The database is created automatically via `EnsureCreated()` on first run. New columns are added at startup via `ApplyColumnAdditions` in `Program.cs` — no manual migration step is needed when pulling updates.
+
+To add new EF entities or tables, use migrations:
 
 ```powershell
 cd CaravanCMS.Api
@@ -138,7 +143,8 @@ CaravanCMS/
 │   │   ├── ExcelImportService.cs  # MechanicDesk Excel parser
 │   │   ├── FileScanner.cs         # Folder walk + document linking
 │   │   └── FuzzyMatcher.cs        # Caravan-to-file matching
-│   └── Middleware/ApiKeyMiddleware.cs
+│   ├── Middleware/ApiKeyMiddleware.cs
+│   └── TrayApplicationContext.cs  # Windows tray icon + API lifecycle
 ├── CaravanCMS.Admin/
 │   ├── Views/                     # Import, Scan, Settings dialogs
 │   ├── ViewModels/                # MVVM logic
