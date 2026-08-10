@@ -2,15 +2,17 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="CaravanCMS — Settings"
-        Height="440" Width="560"
-        ResizeMode="NoResize"
+        Width="560"
+        SizeToContent="Height"
+        MinHeight="440" MinWidth="560"
+        ResizeMode="CanResizeWithGrip"
         WindowStartupLocation="CenterOwner"
         Background="{StaticResource AppBackground}">
 
     <Grid Margin="28">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
@@ -37,6 +39,24 @@
                     <PasswordBox x:Name="PwdApiKey" Height="36"
                                  FontFamily="Segoe UI" FontSize="13" Padding="10,7"
                                  BorderBrush="{StaticResource BorderPink}" BorderThickness="1.5"/>
+                </StackPanel>
+
+                <StackPanel Margin="0,0,0,14">
+                    <TextBlock Text="API Executable Path" Style="{StaticResource BodyText}"
+                               FontWeight="SemiBold" Margin="0,0,0,5"/>
+                    <TextBlock Text="Only needed for the Start/Stop API button above — points at CaravanCMS.Api.exe."
+                               Style="{StaticResource SubText}" Margin="0,0,0,5" TextWrapping="Wrap"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="TxtApiExePath" Style="{StaticResource InputBox}"
+                                 Text="{Binding ApiExePath, UpdateSourceTrigger=PropertyChanged}"
+                                 Margin="0,0,8,0"/>
+                        <Button Grid.Column="1" Style="{StaticResource SecondaryButton}"
+                                Content="Browse" Click="BrowseExe_Click"/>
+                    </Grid>
                 </StackPanel>
 
                 <StackPanel Margin="0,0,0,14">

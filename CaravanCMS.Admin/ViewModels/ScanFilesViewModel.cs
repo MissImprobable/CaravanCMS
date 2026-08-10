@@ -110,7 +110,8 @@ public partial class ScanFilesViewModel : ObservableObject
                     RegistrationNumber = item.SelectedCaravan!.RegistrationNumber,
                     FilePath = item.File.FilePath,
                     DocumentType = item.File.SuggestedDocumentType ?? "Document",
-                    Category = yearCustomer
+                    Category = yearCustomer,
+                    LinkMethod = item.File.MatchMethod
                 });
                 item.IsLinked = true;
                 linked++;

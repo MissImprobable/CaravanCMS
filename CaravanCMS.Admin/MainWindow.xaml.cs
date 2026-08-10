@@ -69,6 +69,34 @@ public partial class MainWindow : Window
         dialog.ShowDialog();
         _ = _vm.RefreshStatsCommand.ExecuteAsync(null);
     }
+
+    private void InferredLinks_Click(object sender, RoutedEventArgs e)
+    {
+        if (_vm.ApiClientInstance is null)
+        {
+            MessageBox.Show("Not connected to API. Check settings.", "CaravanCMS Admin",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        InferredLinksDialog dialog = new(_vm.ApiClientInstance);
+        dialog.Owner = this;
+        dialog.ShowDialog();
+    }
+
+    private void CustomerConversations_Click(object sender, RoutedEventArgs e)
+    {
+        if (_vm.ApiClientInstance is null)
+        {
+            MessageBox.Show("Not connected to API. Check settings.", "CaravanCMS Admin",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        CustomerConversationsDialog dialog = new(_vm.ApiClientInstance);
+        dialog.Owner = this;
+        dialog.ShowDialog();
+    }
 }
 
 /// <summary>Converts a bool to green/red color for the status dot. Used inline in XAML.</summary>

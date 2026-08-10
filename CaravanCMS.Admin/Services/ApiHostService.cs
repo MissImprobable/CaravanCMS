@@ -15,7 +15,10 @@ public class ApiHostService : IDisposable
     private readonly string _apiUrl;
     private bool _disposed;
 
-    public bool IsRunning => _process is { HasExited: false };
+    /// <summary>True when a healthy API was found already running (started outside this app) rather than launched by us.</summary>
+    private bool _externallyManaged;
+
+    public bool IsRunning => _process is { HasExited: false } || _externallyManaged;
 
     public ApiHostService(string apiExePath, string apiUrl)
     {
@@ -24,12 +27,21 @@ public class ApiHostService : IDisposable
     }
 
     /// <summary>
-    /// Starts the API process if it is not already running.
+    /// Starts the API process if it is not already running — first checking whether a healthy
+    /// instance is already reachable at the configured URL (e.g. started manually, or by another
+    /// copy of Admin), before trying to locate and launch the exe.
     /// Returns immediately — use WaitUntilReadyAsync to confirm the API is accepting requests.
     /// </summary>
-    public bool Start()
+    public async Task<bool> StartAsync()
     {
         if (IsRunning) return true;
+
+        if (await IsHealthyAsync())
+        {
+            _externallyManaged = true;
+            return true;
+        }
+
         if (!File.Exists(_exePath)) return false;
 
         ProcessStartInfo psi = new(_exePath)
@@ -45,33 +57,48 @@ public class ApiHostService : IDisposable
         return _process is not null;
     }
 
+    /// <summary>Single, immediate check of the API's unauthenticated health endpoint.</summary>
+    private async Task<bool> IsHealthyAsync()
+    {
+        try
+        {
+            using HttpClient http = new() { Timeout = TimeSpan.FromSeconds(2) };
+            HttpResponseMessage r = await http.GetAsync(_apiUrl.TrimEnd('/') + "/health");
+            return r.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     /// <summary>
-    /// Polls the API health endpoint until it responds or the timeout elapses.
-    /// Call after Start() to know when the API is actually ready.
+    /// Polls the API's unauthenticated health endpoint until it responds or the timeout elapses.
+    /// Call after StartAsync() to know when the API is actually ready.
     /// </summary>
     public async Task<bool> WaitUntilReadyAsync(TimeSpan timeout)
     {
-        using HttpClient http = new() { Timeout = TimeSpan.FromSeconds(2) };
-        string healthUrl = _apiUrl.TrimEnd('/') + "/api/caravans/stats";
-
         DateTime deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
         {
-            try
-            {
-                HttpResponseMessage r = await http.GetAsync(healthUrl);
-                if (r.IsSuccessStatusCode) return true;
-            }
-            catch { }
-
+            if (await IsHealthyAsync()) return true;
             await Task.Delay(300);
         }
         return false;
     }
 
-    /// <summary>Gracefully stops the managed API process.</summary>
+    /// <summary>
+    /// Stops the managed API process. Does nothing if the API is externally managed (we never
+    /// launched it, so we have no process handle to stop, and shouldn't assume ownership of it).
+    /// </summary>
     public void Stop()
     {
+        if (_externallyManaged)
+        {
+            _externallyManaged = false;
+            return;
+        }
+
         if (_process is null || _process.HasExited) return;
 
         try

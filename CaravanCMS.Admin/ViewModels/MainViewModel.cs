@@ -64,7 +64,7 @@ public partial class MainViewModel : ObservableObject
         else
         {
             StatusMessage = "Starting API...";
-            bool started = host.Start();
+            bool started = await host.StartAsync();
             if (!started)
             {
                 StatusMessage = "Could not find CaravanCMS.Api.exe — check the path in Settings.";

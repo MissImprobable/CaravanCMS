@@ -1,0 +1,95 @@
+<Window x:Class="CaravanCMS.Admin.Views.InferredLinksDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Inferred Links Report"
+        Height="620" Width="960"
+        MinHeight="460" MinWidth="700"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource AppBackground}">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </Window.Resources>
+
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Margin="0,0,0,16">
+            <TextBlock Text="Inferred Links Report" Style="{StaticResource HeadingLarge}"/>
+            <TextBlock TextWrapping="Wrap" Style="{StaticResource SubText}">
+                Documents linked via fuzzy or inferred matching — where the rego was not directly
+                in the filename. Review these to confirm each file is attached to the right caravan.
+            </TextBlock>
+        </StackPanel>
+
+        <!-- Controls -->
+        <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Filter method:" Style="{StaticResource SubText}"
+                               VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <ComboBox ItemsSource="{Binding MethodFilters}"
+                              SelectedItem="{Binding FilterMethod}"
+                              MinWidth="170" Padding="8,5"
+                              FontFamily="Segoe UI" FontSize="13"/>
+                </StackPanel>
+
+                <TextBlock Grid.Column="1" Text="{Binding SummaryText}"
+                           Style="{StaticResource SubText}" VerticalAlignment="Center"
+                           Margin="16,0" TextWrapping="Wrap"/>
+
+                <Button Grid.Column="2" Style="{StaticResource PrimaryButton}"
+                        Content="⟳  Load Report" Command="{Binding LoadReportCommand}"
+                        MinWidth="130"/>
+            </Grid>
+        </Border>
+
+        <!-- Main content area — progress bar overlaps the grid row while loading -->
+        <Grid Grid.Row="2">
+            <ProgressBar Style="{StaticResource PinkProgress}" VerticalAlignment="Top"
+                         IsIndeterminate="True" Margin="0,0,0,4"
+                         Visibility="{Binding IsLoading, Converter={StaticResource BoolToVis}}"/>
+
+            <!-- Results DataGrid -->
+            <Border Style="{StaticResource Card}" Margin="0"
+                    Visibility="{Binding HasResults, Converter={StaticResource BoolToVis}}">
+                <DataGrid ItemsSource="{Binding FilteredItems}"
+                          Style="{StaticResource PinkDataGrid}"
+                          ColumnHeaderStyle="{StaticResource PinkDataGridColumnHeader}"
+                          AutoGenerateColumns="False" IsReadOnly="True">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Rego"         Binding="{Binding RegistrationNumber}" Width="90"/>
+                        <DataGridTextColumn Header="Caravan"      Binding="{Binding CaravanDescription}" Width="175"/>
+                        <DataGridTextColumn Header="File"         Binding="{Binding FileName}"           Width="190"/>
+                        <DataGridTextColumn Header="Doc Type"     Binding="{Binding DocumentType}"       Width="120"/>
+                        <DataGridTextColumn Header="Match Method" Binding="{Binding LinkMethod}"         Width="140"/>
+                        <DataGridTextColumn Header="Linked On"
+                                            Binding="{Binding CreatedAt, StringFormat='{}{0:dd MMM yyyy}'}"
+                                            Width="90"/>
+                        <DataGridTextColumn Header="File Path"    Binding="{Binding FilePath}"           Width="*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Border>
+        </Grid>
+
+        <!-- Status + Close -->
+        <Grid Grid.Row="3" Margin="0,12,0,0">
+            <TextBlock Text="{Binding StatusText}" Style="{StaticResource SubText}"
+                       VerticalAlignment="Center"/>
+            <Button HorizontalAlignment="Right" Style="{StaticResource SecondaryButton}"
+                    Content="Close" IsCancel="True" Click="Close_Click"/>
+        </Grid>
+    </Grid>
+</Window>

@@ -136,6 +136,42 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Inferred links report card -->
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                            <TextBlock Text="🔍" FontSize="22" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                            <StackPanel>
+                                <TextBlock Text="Inferred Links Report" Style="{StaticResource HeadingMedium}"/>
+                                <TextBlock Text="Review documents matched via folder inference or fuzzy matching — confirm they're linked to the right caravan."
+                                           Style="{StaticResource SubText}" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <Separator Background="{StaticResource BorderPink}" Height="1" Margin="0,0,0,12"/>
+                        <Button Style="{StaticResource SecondaryButton}"
+                                Content="View Inferred Links"
+                                Click="InferredLinks_Click" MinWidth="200" HorizontalAlignment="Left"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Customer conversations (CRM) card -->
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                            <TextBlock Text="💬" FontSize="22" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                            <StackPanel>
+                                <TextBlock Text="Customer Conversations" Style="{StaticResource HeadingMedium}"/>
+                                <TextBlock Text="Search a customer's communication history, tag conversations by purpose, or log a call or note."
+                                           Style="{StaticResource SubText}" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <Separator Background="{StaticResource BorderPink}" Height="1" Margin="0,0,0,12"/>
+                        <Button Style="{StaticResource SecondaryButton}"
+                                Content="Open Customer Conversations"
+                                Click="CustomerConversations_Click" MinWidth="200" HorizontalAlignment="Left"/>
+                    </StackPanel>
+                </Border>
+
                 <!-- Database info -->
                 <Border Style="{StaticResource Card}">
                     <Grid>

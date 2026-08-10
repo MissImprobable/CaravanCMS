@@ -116,12 +116,79 @@ public class ApiClient
         return doc ?? throw new ApiException("Server returned empty document response.");
     }
 
+    /// <summary>Returns all documents linked via inferred/fuzzy methods, for admin review.</summary>
+    public async Task<InferredLinksReportDto> GetInferredLinksReportAsync()
+    {
+        HttpResponseMessage response = await _http.GetAsync("api/documents/inferred-report");
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<InferredLinksReportDto>(JsonOpts)
+               ?? new InferredLinksReportDto();
+    }
+
     /// <summary>Returns all caravans (lightweight summary list).</summary>
     public async Task<List<CaravanSummaryDto>> GetCaravansAsync()
     {
         HttpResponseMessage response = await _http.GetAsync("api/caravans");
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<List<CaravanSummaryDto>>(JsonOpts) ?? new();
+    }
+
+    /// <summary>Searches customers by name, email, phone, or customer number.</summary>
+    public async Task<List<CustomerLookupDto>> SearchCustomersAsync(string query)
+    {
+        string encoded = Uri.EscapeDataString(query);
+        HttpResponseMessage response = await _http.GetAsync($"api/customers/search?q={encoded}");
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<List<CustomerLookupDto>>(JsonOpts) ?? new();
+    }
+
+    /// <summary>Returns every conversation thread for a customer, newest activity first.</summary>
+    public async Task<List<ConversationDto>> GetCustomerConversationsAsync(int customerId)
+    {
+        HttpResponseMessage response = await _http.GetAsync($"api/customers/{customerId}/conversations");
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<List<ConversationDto>>(JsonOpts) ?? new();
+    }
+
+    /// <summary>Starts a new conversation thread for a customer (or returns the existing one, if matched by ExternalConversationId).</summary>
+    public async Task<ConversationDto> CreateConversationAsync(CreateConversationRequest request)
+    {
+        HttpResponseMessage response = await _http.PostAsJsonAsync("api/conversations", request, JsonOpts);
+        if (!response.IsSuccessStatusCode)
+            throw new ApiException($"Create conversation failed ({(int)response.StatusCode}): {await response.Content.ReadAsStringAsync()}");
+        return await response.Content.ReadFromJsonAsync<ConversationDto>(JsonOpts)
+               ?? throw new ApiException("Server returned empty conversation response.");
+    }
+
+    /// <summary>Appends a message (email, call, note, meeting) to an existing conversation.</summary>
+    public async Task<CommunicationLogDto> AddMessageAsync(int conversationId, LogMessageRequest request)
+    {
+        HttpResponseMessage response = await _http.PostAsJsonAsync($"api/conversations/{conversationId}/messages", request, JsonOpts);
+        if (!response.IsSuccessStatusCode)
+            throw new ApiException($"Log message failed ({(int)response.StatusCode}): {await response.Content.ReadAsStringAsync()}");
+        return await response.Content.ReadFromJsonAsync<CommunicationLogDto>(JsonOpts)
+               ?? throw new ApiException("Server returned empty message response.");
+    }
+
+    /// <summary>Attaches a purpose tag to a conversation, creating the tag if it doesn't already exist.</summary>
+    public async Task<ConversationDto> AddTagAsync(int conversationId, string tagName)
+    {
+        HttpResponseMessage response = await _http.PostAsJsonAsync($"api/conversations/{conversationId}/tags",
+            new AttachTagRequest { Name = tagName }, JsonOpts);
+        if (!response.IsSuccessStatusCode)
+            throw new ApiException($"Add tag failed ({(int)response.StatusCode}): {await response.Content.ReadAsStringAsync()}");
+        return await response.Content.ReadFromJsonAsync<ConversationDto>(JsonOpts)
+               ?? throw new ApiException("Server returned empty conversation response.");
+    }
+
+    /// <summary>Removes a tag from a conversation.</summary>
+    public async Task<ConversationDto> RemoveTagAsync(int conversationId, int tagId)
+    {
+        HttpResponseMessage response = await _http.DeleteAsync($"api/conversations/{conversationId}/tags/{tagId}");
+        if (!response.IsSuccessStatusCode)
+            throw new ApiException($"Remove tag failed ({(int)response.StatusCode}): {await response.Content.ReadAsStringAsync()}");
+        return await response.Content.ReadFromJsonAsync<ConversationDto>(JsonOpts)
+               ?? throw new ApiException("Server returned empty conversation response.");
     }
 }
 
