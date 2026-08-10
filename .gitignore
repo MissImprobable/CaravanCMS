@@ -29,8 +29,14 @@ logs/
 
 # Local settings (machine-specific, may contain secrets)
 appsettings.*.local.json
+appsettings.Production.json
 secrets.json
 *.local.json
+
+# Self-signed cert + private key generated for this office's Outlook add-in HTTPS setup —
+# specific to one deployment, never shared/committed
+CaravanCMS.Api/certs/*.pfx
+CaravanCMS.Api/certs/*.cer
 
 # Claude Code local settings
 .claude/settings.local.json
