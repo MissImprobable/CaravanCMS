@@ -14,6 +14,7 @@
         <local:NullToVisibilityConverter x:Key="NullToVis"/>
         <local:MimeTypeToIconConverter x:Key="MimeToIcon"/>
         <local:ZeroToVisibilityConverter x:Key="ZeroToVis"/>
+        <local:EqualityToVisibilityConverter x:Key="EqualityToVis"/>
         <CollectionViewSource x:Key="GroupedDocs" Source="{Binding Documents}">
             <CollectionViewSource.GroupDescriptions>
                 <PropertyGroupDescription PropertyName="DocumentType"/>
@@ -342,6 +343,149 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </TabItem>
+            <!-- Conversations tab -->
+            <TabItem Style="{StaticResource PinkTabItem}">
+                <TabItem.Header>
+                    <TextBlock>
+                        <Run Text="  Conversations  "/>
+                        <Run Text="{Binding Conversations.Count, StringFormat='({0})', Mode=OneWay}"
+                             Foreground="{StaticResource TextSecondary}" FontSize="11"/>
+                    </TextBlock>
+                </TabItem.Header>
+
+                <Grid Margin="0,12,0,0">
+                    <TextBlock Text="No conversations logged for this customer."
+                               Style="{StaticResource SubText}" HorizontalAlignment="Center"
+                               VerticalAlignment="Center" FontSize="14"
+                               Visibility="{Binding Conversations.Count, Converter={StaticResource ZeroToVis}}"/>
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <!-- Active filter banner -->
+                            <Border Background="{StaticResource LightPink}" CornerRadius="4" Padding="10,6" Margin="0,0,0,10"
+                                    Visibility="{Binding ActiveTagFilter, Converter={StaticResource NullToVis}}">
+                                <TextBlock FontSize="12" Foreground="{StaticResource DeepPink}">
+                                    <Run Text="Showing conversations tagged "/>
+                                    <Run Text="{Binding ActiveTagFilter, Mode=OneWay}" FontWeight="SemiBold"/>
+                                    <Run Text=" — click the tag again to clear."/>
+                                </TextBlock>
+                            </Border>
+
+                            <ItemsControl ItemsSource="{Binding VisibleConversations}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Style="{StaticResource Card}" Margin="0,0,0,10">
+                                            <StackPanel>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Cursor="Hand">
+                                                        <StackPanel.InputBindings>
+                                                            <MouseBinding MouseAction="LeftClick"
+                                                                          Command="{Binding DataContext.ToggleConversationExpandCommand,
+                                                                              RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                          CommandParameter="{Binding}"/>
+                                                        </StackPanel.InputBindings>
+                                                        <TextBlock Text="{Binding Subject, FallbackValue='(No subject)'}"
+                                                                   Style="{StaticResource HeadingMedium}"/>
+                                                        <TextBlock Style="{StaticResource SubText}" Margin="0,2,0,0">
+                                                            <Run Text="{Binding Messages.Count, Mode=OneWay}"/>
+                                                            <Run Text=" messages · last activity "/>
+                                                            <Run Text="{Binding LastActivityAt, StringFormat='dd MMM yyyy'}"/>
+                                                        </TextBlock>
+                                                    </StackPanel>
+
+                                                    <!-- Tag chips -->
+                                                    <ItemsControl Grid.Column="1" ItemsSource="{Binding Tags}" VerticalAlignment="Top">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <StackPanel Orientation="Horizontal"/>
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Border CornerRadius="10" Padding="10,4" Margin="4,0,0,0"
+                                                                        Background="{StaticResource LightPink}"
+                                                                        BorderBrush="{StaticResource BorderPink}" BorderThickness="1"
+                                                                        Cursor="Hand">
+                                                                    <Border.InputBindings>
+                                                                        <MouseBinding MouseAction="LeftClick"
+                                                                                      Command="{Binding DataContext.ToggleTagFilterCommand,
+                                                                                          RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                                      CommandParameter="{Binding Name}"/>
+                                                                    </Border.InputBindings>
+                                                                    <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold"
+                                                                               Foreground="{StaticResource DeepPink}"/>
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </Grid>
+
+                                                <!-- Expanded messages (only for the currently-expanded conversation) -->
+                                                <ItemsControl Margin="0,10,0,0" ItemsSource="{Binding Messages}">
+                                                    <ItemsControl.Visibility>
+                                                        <MultiBinding Converter="{StaticResource EqualityToVis}" Mode="OneWay">
+                                                            <Binding Path="."/>
+                                                            <Binding Path="DataContext.ExpandedConversation"
+                                                                     RelativeSource="{RelativeSource AncestorType=Window}"/>
+                                                        </MultiBinding>
+                                                    </ItemsControl.Visibility>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border BorderBrush="{StaticResource BorderPink}"
+                                                                    BorderThickness="0,1,0,0" Padding="0,8,0,0" Margin="0,4,0,0">
+                                                                <StackPanel>
+                                                                    <TextBlock Style="{StaticResource SubText}">
+                                                                        <Run Text="{Binding Direction}" FontWeight="SemiBold"/>
+                                                                        <Run Text=" · "/>
+                                                                        <Run Text="{Binding FromAddress}"/>
+                                                                        <Run Text=" · "/>
+                                                                        <Run Text="{Binding OccurredAt, StringFormat='dd MMM yyyy HH:mm'}"/>
+                                                                    </TextBlock>
+                                                                    <TextBlock Text="{Binding Body}" Style="{StaticResource BodyText}"
+                                                                               TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                                                </StackPanel>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+
+                                                <!-- Add label (only for the currently-expanded conversation) -->
+                                                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                                    <StackPanel.Visibility>
+                                                        <MultiBinding Converter="{StaticResource EqualityToVis}" Mode="OneWay">
+                                                            <Binding Path="."/>
+                                                            <Binding Path="DataContext.ExpandedConversation"
+                                                                     RelativeSource="{RelativeSource AncestorType=Window}"/>
+                                                        </MultiBinding>
+                                                    </StackPanel.Visibility>
+                                                    <TextBox Width="160" FontSize="12" VerticalContentAlignment="Center"
+                                                             Text="{Binding DataContext.NewTagText,
+                                                                 RelativeSource={RelativeSource AncestorType=Window},
+                                                                 UpdateSourceTrigger=PropertyChanged}">
+                                                        <TextBox.InputBindings>
+                                                            <KeyBinding Key="Return"
+                                                                        Command="{Binding DataContext.AddTagCommand,
+                                                                            RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                                        </TextBox.InputBindings>
+                                                    </TextBox>
+                                                    <Button Content="Add label" Margin="6,0,0,0" FontSize="12"
+                                                            Style="{StaticResource SecondaryButton}"
+                                                            Command="{Binding DataContext.AddTagCommand,
+                                                                RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
                     </ScrollViewer>
                 </Grid>
             </TabItem>

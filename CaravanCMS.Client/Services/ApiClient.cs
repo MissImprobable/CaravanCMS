@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace CaravanCMS.Client.Services;
 
-/// <summary>HTTP client for the CaravanCMS REST API — read-only operations for the Client app.</summary>
+/// <summary>HTTP client for the CaravanCMS REST API.</summary>
 public class ApiClient
 {
     private readonly HttpClient _http;
@@ -77,4 +77,23 @@ public class ApiClient
     }
 
     public string GetDownloadUrl(int documentId) => $"{BaseUrl}/api/documents/{documentId}/download";
+
+    /// <summary>Attaches a purpose tag to a conversation, creating the tag if it doesn't already exist.</summary>
+    public async Task<ConversationDto> AddTagAsync(int conversationId, string tagName)
+    {
+        HttpResponseMessage r = await _http.PostAsJsonAsync($"api/conversations/{conversationId}/tags",
+            new AttachTagRequest { Name = tagName }, JsonOpts);
+        r.EnsureSuccessStatusCode();
+        return await r.Content.ReadFromJsonAsync<ConversationDto>(JsonOpts)
+               ?? throw new InvalidOperationException("Server returned empty conversation response.");
+    }
+
+    /// <summary>Removes a tag from a conversation. The tag itself remains available for reuse.</summary>
+    public async Task<ConversationDto> RemoveTagAsync(int conversationId, int tagId)
+    {
+        HttpResponseMessage r = await _http.DeleteAsync($"api/conversations/{conversationId}/tags/{tagId}");
+        r.EnsureSuccessStatusCode();
+        return await r.Content.ReadFromJsonAsync<ConversationDto>(JsonOpts)
+               ?? throw new InvalidOperationException("Server returned empty conversation response.");
+    }
 }

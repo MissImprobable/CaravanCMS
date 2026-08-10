@@ -17,9 +17,14 @@ public partial class CaravanViewModel : ObservableObject
     [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private string _statusText = "Loading...";
     [ObservableProperty] private JobDetailDto? _expandedJob;
+    [ObservableProperty] private ConversationDto? _expandedConversation;
+    [ObservableProperty] private string? _activeTagFilter;
+    [ObservableProperty] private IEnumerable<ConversationDto> _visibleConversations = Enumerable.Empty<ConversationDto>();
+    [ObservableProperty] private string _newTagText = string.Empty;
 
     public ObservableCollection<JobDetailDto> Jobs { get; } = new();
     public ObservableCollection<DocumentItemViewModel> Documents { get; } = new();
+    public ObservableCollection<ConversationDto> Conversations { get; } = new();
 
     public CaravanViewModel(ApiClient api)
     {
@@ -32,6 +37,8 @@ public partial class CaravanViewModel : ObservableObject
         StatusText = "Loading caravan history...";
         Jobs.Clear();
         Documents.Clear();
+        Conversations.Clear();
+        ActiveTagFilter = null;
 
         try
         {
@@ -54,6 +61,10 @@ public partial class CaravanViewModel : ObservableObject
                 // Fire-and-forget thumbnail load — updates UI when ready
                 _ = item.LoadThumbnailAsync(_api.DownloadDocumentAsync);
             }
+
+            foreach (ConversationDto conv in detail.Conversations)
+                Conversations.Add(conv);
+            ApplyTagFilter();
 
             StatusText = $"{detail.Jobs.Count} jobs · {detail.Documents.Count} documents";
         }
@@ -117,6 +128,56 @@ public partial class CaravanViewModel : ObservableObject
     private void ToggleJobExpand(JobDetailDto job)
     {
         ExpandedJob = ExpandedJob == job ? null : job;
+    }
+
+    [RelayCommand]
+    private void ToggleConversationExpand(ConversationDto conversation)
+    {
+        ExpandedConversation = ExpandedConversation == conversation ? null : conversation;
+    }
+
+    /// <summary>Clicking a tag chip filters the Conversations list to just that tag; clicking it again clears the filter.</summary>
+    [RelayCommand]
+    private void ToggleTagFilter(string tagName)
+    {
+        ActiveTagFilter = ActiveTagFilter == tagName ? null : tagName;
+        ApplyTagFilter();
+    }
+
+    private void ApplyTagFilter()
+    {
+        VisibleConversations = string.IsNullOrEmpty(ActiveTagFilter)
+            ? Conversations.ToList()
+            : Conversations.Where(c => c.Tags.Any(t => t.Name == ActiveTagFilter)).ToList();
+    }
+
+    /// <summary>Adds a label to the currently-expanded conversation, creating the tag if it doesn't already exist.</summary>
+    [RelayCommand]
+    private async Task AddTagAsync()
+    {
+        if (ExpandedConversation is null) return;
+        string tag = NewTagText.Trim();
+        if (tag.Length == 0) return;
+
+        NewTagText = string.Empty;
+        try
+        {
+            ConversationDto updated = await _api.AddTagAsync(ExpandedConversation.Id, tag);
+            ReplaceConversation(updated);
+            StatusText = $"Tagged \"{tag}\".";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Failed to add tag: {ex.Message}";
+        }
+    }
+
+    private void ReplaceConversation(ConversationDto updated)
+    {
+        int index = Conversations.ToList().FindIndex(c => c.Id == updated.Id);
+        if (index >= 0) Conversations[index] = updated;
+        ExpandedConversation = updated;
+        ApplyTagFilter();
     }
 
     private static string BuildSaveFilter(string? mimeType, string ext)
