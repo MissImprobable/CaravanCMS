@@ -122,13 +122,15 @@ public class DocumentsController : ControllerBase
             MimeType = GetMimeType(fileName),
             UploadedDate = DateTime.UtcNow,
             IsLocalPath = true,
+            LinkMethod = request.LinkMethod,
             CreatedAt = DateTime.UtcNow
         };
 
         _db.Documents.Add(doc);
         await _db.SaveChangesAsync();
 
-        _logger.LogInformation("Linked document {FileName} to caravan {Rego}", fileName, request.RegistrationNumber);
+        _logger.LogInformation("Linked document {FileName} to caravan {Rego} via {Method}",
+            fileName, request.RegistrationNumber, request.LinkMethod ?? "Manual");
 
         DocumentDto dto = new()
         {
@@ -142,10 +144,50 @@ public class DocumentsController : ControllerBase
             IsLocalPath = doc.IsLocalPath,
             MimeType = doc.MimeType,
             Notes = doc.Notes,
+            LinkMethod = doc.LinkMethod,
             CreatedAt = doc.CreatedAt
         };
 
         return CreatedAtAction(nameof(GetAll), new { rego = doc.RegistrationNumber }, dto);
+    }
+
+    /// <summary>
+    /// Returns all documents linked via inferred or fuzzy matching methods (SameFolderInference,
+    /// FuzzyMakeModel, RegInFolderPath, VinInFolderPath), grouped for admin review.
+    /// </summary>
+    [HttpGet("inferred-report")]
+    [ProducesResponseType(typeof(InferredLinksReportDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<InferredLinksReportDto>> GetInferredReport()
+    {
+        // Explicit OR comparisons rather than array.Contains(...) — the latter hits a .NET 10 runtime
+        // bug (TypeLoadException on ReadOnlySpan<string> as a generic arg) when EF Core 9 evaluates a
+        // closure-captured array as a query parameter. See CaravanCMS memory for the full trace.
+        List<Document> docs = await _db.Documents
+            .Include(d => d.Caravan)
+            .Where(d => d.LinkMethod == "SameFolderInference" ||
+                        d.LinkMethod == "FuzzyMakeModel" ||
+                        d.LinkMethod == "RegInFolderPath" ||
+                        d.LinkMethod == "VinInFolderPath")
+            .OrderBy(d => d.LinkMethod)
+            .ThenBy(d => d.RegistrationNumber)
+            .ThenBy(d => d.FileName)
+            .ToListAsync();
+
+        List<InferredLinkItemDto> items = docs.Select(d => new InferredLinkItemDto
+        {
+            DocumentId = d.Id,
+            FileName = d.FileName,
+            FilePath = d.FilePath,
+            RegistrationNumber = d.RegistrationNumber,
+            CaravanDescription = d.Caravan is not null
+                ? $"{d.Caravan.Year} {d.Caravan.Make} {d.Caravan.Model}".Trim()
+                : null,
+            DocumentType = d.DocumentType,
+            LinkMethod = d.LinkMethod!,
+            CreatedAt = d.CreatedAt
+        }).ToList();
+
+        return Ok(new InferredLinksReportDto { TotalCount = items.Count, Items = items });
     }
 
     /// <summary>Removes a document link (does NOT delete the file from disk).</summary>

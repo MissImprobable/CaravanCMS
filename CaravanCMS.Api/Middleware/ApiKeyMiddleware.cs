@@ -25,9 +25,11 @@ public class ApiKeyMiddleware
     {
         string path = context.Request.Path.Value ?? string.Empty;
 
-        // Skip auth for Swagger and health — these are non-sensitive
+        // Skip auth for Swagger, health, and the Outlook add-in assets — these are non-sensitive,
+        // and Outlook can't attach custom headers when it fetches the manifest/task pane anyway.
         if (path.StartsWith("/swagger", StringComparison.OrdinalIgnoreCase) ||
-            path.StartsWith("/health", StringComparison.OrdinalIgnoreCase))
+            path.StartsWith("/health", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/addin", StringComparison.OrdinalIgnoreCase))
         {
             await _next(context);
             return;

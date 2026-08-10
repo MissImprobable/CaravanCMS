@@ -2,6 +2,7 @@ using CaravanCMS.Api.Data;
 using CaravanCMS.Core;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text.RegularExpressions;
 
 namespace CaravanCMS.Api.Controllers;
 
@@ -66,6 +67,11 @@ public class CaravansController : ControllerBase
     {
         Caravan? caravan = await _db.Caravans
             .Include(c => c.Customer)
+                .ThenInclude(cu => cu.Conversations)
+                    .ThenInclude(conv => conv.Tags)
+            .Include(c => c.Customer)
+                .ThenInclude(cu => cu.Conversations)
+                    .ThenInclude(conv => conv.Messages)
             .Include(c => c.Documents)
             .Include(c => c.Jobs)
                 .ThenInclude(j => j.Invoices)
@@ -138,6 +144,76 @@ public class CaravansController : ControllerBase
 
         _logger.LogInformation("Search '{Term}' returned {Count} caravans", q, matches.Count);
         return Ok(matches);
+    }
+
+    /// <summary>
+    /// Scans free text (an email subject + body) for known registration numbers or VINs —
+    /// used by the Outlook add-in to auto-link an email to a specific caravan.
+    /// Tolerates spaces/dashes within the value (e.g. "ABC 123" matches rego "ABC123") and
+    /// requires a non-alphanumeric boundary on both sides to avoid matching inside longer tokens.
+    /// </summary>
+    [HttpPost("detect")]
+    [ProducesResponseType(typeof(List<DetectedCaravanDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<DetectedCaravanDto>>> DetectCaravans([FromBody] DetectCaravansRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Text))
+            return Ok(new List<DetectedCaravanDto>());
+
+        List<Caravan> caravans = await _db.Caravans
+            .Include(c => c.Customer)
+            .AsNoTracking()
+            .ToListAsync();
+
+        List<DetectedCaravanDto> results = new();
+
+        foreach (Caravan c in caravans)
+        {
+            Match? match = null;
+            string method = string.Empty;
+
+            if (!string.IsNullOrEmpty(c.RegistrationNumber) && c.RegistrationNumber.Length >= 3)
+            {
+                match = FindFuzzyToken(request.Text, c.RegistrationNumber);
+                method = "Registration";
+            }
+
+            if (match is null && !string.IsNullOrEmpty(c.Vin) && c.Vin.Length >= 5)
+            {
+                match = FindFuzzyToken(request.Text, c.Vin);
+                method = "Vin";
+            }
+
+            if (match is not null)
+            {
+                results.Add(new DetectedCaravanDto
+                {
+                    RegistrationNumber = c.RegistrationNumber,
+                    Make = c.Make,
+                    Model = c.Model,
+                    Year = c.Year,
+                    CustomerId = c.CustomerId,
+                    CustomerName = c.Customer?.Name,
+                    MatchedText = match.Value,
+                    MatchMethod = method
+                });
+            }
+        }
+
+        _logger.LogInformation("POST /api/caravans/detect — found {Count} matches in {Length} chars of text",
+            results.Count, request.Text.Length);
+        return Ok(results);
+    }
+
+    /// <summary>
+    /// Finds <paramref name="token"/> within <paramref name="text"/>, allowing an optional space or
+    /// dash between each character, and requiring a non-alphanumeric boundary on both sides.
+    /// </summary>
+    private static Match? FindFuzzyToken(string text, string token)
+    {
+        string spaced = string.Join("[ -]?", token.Select(ch => Regex.Escape(ch.ToString())));
+        string pattern = $@"(?<![A-Za-z0-9]){spaced}(?![A-Za-z0-9])";
+        Match match = Regex.Match(text, pattern, RegexOptions.IgnoreCase);
+        return match.Success ? match : null;
     }
 
     /// <summary>Returns summary statistics for the dashboard.</summary>
@@ -257,6 +333,30 @@ public class CaravansController : ControllerBase
             MimeType = d.MimeType,
             Notes = d.Notes,
             CreatedAt = d.CreatedAt
-        }).ToList()
+        }).ToList(),
+        Conversations = (c.Customer?.Conversations ?? new List<Conversation>())
+            .OrderByDescending(conv => conv.LastActivityAt)
+            .Select(conv => new ConversationDto
+            {
+                Id = conv.Id,
+                CustomerId = conv.CustomerId,
+                RegistrationNumber = conv.RegistrationNumber,
+                Subject = conv.Subject,
+                ExternalConversationId = conv.ExternalConversationId,
+                StartedAt = conv.StartedAt,
+                LastActivityAt = conv.LastActivityAt,
+                Tags = conv.Tags.Select(t => new TagDto { Id = t.Id, Name = t.Name }).OrderBy(t => t.Name).ToList(),
+                Messages = conv.Messages.OrderBy(m => m.OccurredAt).Select(m => new CommunicationLogDto
+                {
+                    Id = m.Id,
+                    ConversationId = m.ConversationId,
+                    Type = m.Type,
+                    Direction = m.Direction,
+                    FromAddress = m.FromAddress,
+                    Body = m.Body,
+                    LoggedBy = m.LoggedBy,
+                    OccurredAt = m.OccurredAt
+                }).ToList()
+            }).ToList()
     };
 }

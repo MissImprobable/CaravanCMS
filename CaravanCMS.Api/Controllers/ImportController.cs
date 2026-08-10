@@ -161,13 +161,15 @@ public class ImportController : ControllerBase
             MimeType = mimeType,
             UploadedDate = DateTime.UtcNow,
             IsLocalPath = true,
+            LinkMethod = request.LinkMethod,
             CreatedAt = DateTime.UtcNow
         };
 
         _db.Documents.Add(doc);
         await _db.SaveChangesAsync();
 
-        _logger.LogInformation("Linked document {FileName} to caravan {Rego}", fileName, request.RegistrationNumber);
+        _logger.LogInformation("Linked document {FileName} to caravan {Rego} via {Method}",
+            fileName, request.RegistrationNumber, request.LinkMethod ?? "Manual");
 
         return Created(string.Empty, new DocumentDto
         {

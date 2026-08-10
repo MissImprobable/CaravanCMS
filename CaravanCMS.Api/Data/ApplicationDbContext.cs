@@ -14,6 +14,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceItem> InvoiceItems => Set<InvoiceItem>();
     public DbSet<Document> Documents => Set<Document>();
+    public DbSet<Conversation> Conversations => Set<Conversation>();
+    public DbSet<CommunicationLog> CommunicationLogs => Set<CommunicationLog>();
+    public DbSet<Tag> Tags => Set<Tag>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -123,6 +126,56 @@ public class ApplicationDbContext : DbContext
             e.HasOne(d => d.Caravan)
              .WithMany(c => c.Documents)
              .HasForeignKey(d => d.RegistrationNumber)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── Conversation ──────────────────────────────────────────────────────
+        modelBuilder.Entity<Conversation>(e =>
+        {
+            e.HasKey(c => c.Id);
+            e.HasIndex(c => c.CustomerId);
+            e.HasIndex(c => c.RegistrationNumber);
+            e.HasIndex(c => c.ExternalConversationId);
+
+            e.HasOne(c => c.Customer)
+             .WithMany(cu => cu.Conversations)
+             .HasForeignKey(c => c.CustomerId)
+             .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(c => c.Caravan)
+             .WithMany(ca => ca.Conversations)
+             .HasForeignKey(c => c.RegistrationNumber)
+             .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasMany(c => c.Tags)
+             .WithMany(t => t.Conversations)
+             .UsingEntity(j => j.ToTable("ConversationTags"));
+        });
+
+        // ── CommunicationLog ─────────────────────────────────────────────────
+        modelBuilder.Entity<CommunicationLog>(e =>
+        {
+            e.HasKey(m => m.Id);
+            e.HasIndex(m => m.ConversationId);
+            e.HasIndex(m => m.ExternalMessageId).IsUnique().HasFilter("[ExternalMessageId] IS NOT NULL");
+
+            e.HasOne(m => m.Conversation)
+             .WithMany(c => c.Messages)
+             .HasForeignKey(m => m.ConversationId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── Tag ───────────────────────────────────────────────────────────────
+        // Scoped per customer — the unique index is on (CustomerId, Name), not Name alone, so the
+        // same label text for two different customers is two distinct, unlinked Tag rows.
+        modelBuilder.Entity<Tag>(e =>
+        {
+            e.HasKey(t => t.Id);
+            e.HasIndex(t => new { t.CustomerId, t.Name }).IsUnique();
+
+            e.HasOne(t => t.Customer)
+             .WithMany()
+             .HasForeignKey(t => t.CustomerId)
              .OnDelete(DeleteBehavior.Cascade);
         });
     }

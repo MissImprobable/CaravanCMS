@@ -121,18 +121,18 @@ public class ExcelImportService
                         "number plate", "plate", "license plate", "licence plate", "numberplate");
                     string? vin = GetCell(vehiclesSheet, row, cols, "vin", "chassis", "chassis number", "serial number", "serial no");
 
-                    // Rego is the single most important value — warn clearly when absent
-                    if (string.IsNullOrWhiteSpace(rego))
+                    // Rego is the primary identifier; VIN is a fallback worth flagging so it's known
+                    // this caravan is keyed by VIN, not a real rego. A vehicle with neither is not an
+                    // error — MechanicDesk genuinely has no way to identify it — so it's skipped
+                    // silently below (in GetOrCreateCaravanAsync) rather than adding warning noise.
+                    if (string.IsNullOrWhiteSpace(rego) && !string.IsNullOrWhiteSpace(vin))
                     {
                         string identifier = mdId ?? vin ?? $"row {row}";
-                        result.Warnings.Add($"Vehicles row {row} ({identifier}): no registration number (rego) found — this vehicle will be identified by {(string.IsNullOrWhiteSpace(vin) ? "vehicle ID only" : "VIN only")}.");
+                        result.Warnings.Add($"Vehicles row {row} ({identifier}): no registration number (rego) found — this vehicle will be identified by VIN only.");
                     }
 
                     if (string.IsNullOrWhiteSpace(rego) && string.IsNullOrWhiteSpace(vin) && string.IsNullOrWhiteSpace(mdId))
-                    {
-                        result.Warnings.Add($"Vehicles row {row}: skipped — no rego, VIN, or vehicle ID. Cannot identify this vehicle.");
                         continue;
-                    }
 
                     // Resolve the owning customer
                     string? customerMdId = GetCell(vehiclesSheet, row, cols, "customer id", "customerid", "client id", "clientid", "owner id", "ownerid");
@@ -185,6 +185,8 @@ public class ExcelImportService
                     vehicleRegoMap[key] = caravan.RegistrationNumber;
                     if (!string.IsNullOrEmpty(rego) && !vehicleRegoMap.ContainsKey(rego))
                         vehicleRegoMap[rego] = caravan.RegistrationNumber;
+                    if (!string.IsNullOrEmpty(vin) && !vehicleRegoMap.ContainsKey(vin))
+                        vehicleRegoMap[vin] = caravan.RegistrationNumber;
                 }
                 catch (Exception ex)
                 {
@@ -228,8 +230,10 @@ public class ExcelImportService
         string? rego = GetCell(sheet, row, cols,
             "rego", "registration", "registration number", "reg", "reg number", "reg no",
             "number plate", "plate", "license plate", "licence plate");
+        string? vin = GetCell(sheet, row, cols, "vin", "chassis", "chassis number", "serial number", "serial no");
 
-        // Resolve caravan rego: try vehicle ID first (via map), then rego directly
+        // Resolve caravan rego: try vehicle ID first (via map), then rego, then VIN — a vehicle
+        // with no rego on file was imported keyed by VIN instead, so VIN is how its jobs find it.
         string? caravanRego = null;
         if (!string.IsNullOrEmpty(vehicleMdId) && vehicleMap.TryGetValue(vehicleMdId, out string? v1))
             caravanRego = v1;
@@ -237,17 +241,24 @@ public class ExcelImportService
             caravanRego = v2;
         if (caravanRego is null && !string.IsNullOrEmpty(rego))
             caravanRego = rego; // rego IS the PK — use it directly
+        if (caravanRego is null && !string.IsNullOrEmpty(vin) && vehicleMap.TryGetValue(vin, out string? v3))
+            caravanRego = v3;
         if (caravanRego is null && !string.IsNullOrEmpty(vehicleMdId))
         {
             Caravan? c = await _db.Caravans.FirstOrDefaultAsync(c => c.MechanicDeskId == vehicleMdId);
             if (c is not null) caravanRego = c.RegistrationNumber;
         }
-
-        if (caravanRego is null)
+        if (caravanRego is null && !string.IsNullOrEmpty(vin))
         {
-            result.Warnings.Add($"Jobs row {row}: skipped — could not find matching vehicle (vehicle ID '{vehicleMdId ?? "none"}', rego '{rego ?? "none"}').");
-            return;
+            Caravan? c = await _db.Caravans.FirstOrDefaultAsync(c => c.Vin == vin);
+            if (c is not null) caravanRego = c.RegistrationNumber;
         }
+
+        // No matching vehicle — almost always because that vehicle itself had no rego/VIN to import
+        // it with in the first place, so there's nothing here to attach this job to. Same as the
+        // caravan-side skip, this is skipped silently rather than adding warning noise.
+        if (caravanRego is null)
+            return;
 
         string? customerMdId = GetCell(sheet, row, cols, "customer id", "customerid", "client id");
         int? customerId = ResolveCustomerId(customerMdId, customerMap);
@@ -597,15 +608,22 @@ public class ExcelImportService
             return existing;
         }
 
-        if (string.IsNullOrWhiteSpace(rego))
-        {
-            result.Warnings.Add($"Skipping caravan (mdId: {mdId ?? "none"}, vin: {vin ?? "none"}) — no registration number (rego is required as primary key).");
+        // Rego is the primary key, but when it's missing on the source data we fall back to VIN
+        // as the identifier rather than dropping the vehicle (and everything linked to it) entirely.
+        // The record can be re-keyed to a real rego later, once MechanicDesk has one on file.
+        string? effectiveRego = !string.IsNullOrWhiteSpace(rego) ? rego : vin;
+
+        // No rego and no VIN — genuinely no way to identify this vehicle. Not an error; MechanicDesk
+        // just never had one recorded for it, so it's skipped silently rather than adding warning noise.
+        if (string.IsNullOrWhiteSpace(effectiveRego))
             return null;
-        }
+
+        if (string.IsNullOrWhiteSpace(rego))
+            result.Warnings.Add($"Caravan {effectiveRego}: no rego on file, using VIN as the identifier — update the registration number once it's known.");
 
         Caravan caravan = new()
         {
-            RegistrationNumber = rego,
+            RegistrationNumber = effectiveRego,
             CustomerId = customerId,
             Vin = vin,
             Make = make,

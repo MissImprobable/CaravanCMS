@@ -48,9 +48,15 @@ public class FileScanner
 
         _logger.LogInformation("Scanning folder: {Folder}", folderPath);
 
-        // Load all caravans into memory once — avoids N+1 for large scans
+        // Load all caravans and already-linked documents into memory once — avoids N+1 for large scans
         List<Caravan> allCaravans = await _db.Caravans.AsNoTracking().ToListAsync();
         _logger.LogDebug("Loaded {Count} caravans for matching", allCaravans.Count);
+
+        List<Document> linkedDocs = await _db.Documents.AsNoTracking().ToListAsync();
+        var folderRegoIndex = FuzzyMatcher.BuildFolderRegoIndex(
+            linkedDocs.Select(d => (d.FilePath, d.RegistrationNumber)));
+        _logger.LogDebug("Built folder-rego index from {Count} linked documents ({Folders} folders)",
+            linkedDocs.Count, folderRegoIndex.Count);
 
         // Enumerate all supported files
         List<string> files = new();
@@ -75,7 +81,7 @@ public class FileScanner
         {
             try
             {
-                FileMatchDto match = await _matcher.MatchFileAsync(file, allCaravans);
+                FileMatchDto match = await _matcher.MatchFileAsync(file, allCaravans, folderRegoIndex);
                 ParseFolderStructure(file, folderPath, match);
                 matches.Add(match);
 
