@@ -78,6 +78,24 @@ public class ApiClient
 
     public string GetDownloadUrl(int documentId) => $"{BaseUrl}/api/documents/{documentId}/download";
 
+    /// <summary>Starts a new conversation thread for a customer (or returns the existing one, if matched by ExternalConversationId).</summary>
+    public async Task<ConversationDto> CreateConversationAsync(CreateConversationRequest request)
+    {
+        HttpResponseMessage r = await _http.PostAsJsonAsync("api/conversations", request, JsonOpts);
+        r.EnsureSuccessStatusCode();
+        return await r.Content.ReadFromJsonAsync<ConversationDto>(JsonOpts)
+               ?? throw new InvalidOperationException("Server returned empty conversation response.");
+    }
+
+    /// <summary>Appends a message (call, note, meeting, email) to an existing conversation.</summary>
+    public async Task<CommunicationLogDto> AddMessageAsync(int conversationId, LogMessageRequest request)
+    {
+        HttpResponseMessage r = await _http.PostAsJsonAsync($"api/conversations/{conversationId}/messages", request, JsonOpts);
+        r.EnsureSuccessStatusCode();
+        return await r.Content.ReadFromJsonAsync<CommunicationLogDto>(JsonOpts)
+               ?? throw new InvalidOperationException("Server returned empty message response.");
+    }
+
     /// <summary>Attaches a purpose tag to a conversation, creating the tag if it doesn't already exist.</summary>
     public async Task<ConversationDto> AddTagAsync(int conversationId, string tagName)
     {

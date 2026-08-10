@@ -76,12 +76,14 @@ function getItemBodyText() {
 // We cut at the first quote-chain marker found, so each logged message is just what this
 // sender actually wrote — the earlier messages are already logged separately in their own
 // CommunicationLog rows from when *they* came through.
+// Each nesting level of a reply chain is indented with leading tabs/spaces (Apple/iPhone Mail does
+// this heavily), so every marker tolerates leading whitespace rather than anchoring straight at ^.
 const REPLY_CHAIN_PATTERNS = [
-  /^_{10,}\s*$/m,                             // Outlook's "________________________________" divider
-  /^-{5,}\s*Original Message\s*-{5,}\s*$/im,  // "-----Original Message-----"
-  /^-{5,}\s*Forwarded Message\s*-{5,}\s*$/im, // "-----Forwarded Message-----"
-  /^From:\s.+\r?\n(?:Sent|Date):\s.+$/im,     // Outlook's "From: ...\nSent/Date: ..." header block
-  /^On .{5,100} wrote:\s*$/im                 // Gmail/Apple Mail-style "On <date>, <name> wrote:"
+  /^[ \t]*_{10,}\s*$/m,                             // Outlook's "________________________________" divider
+  /^[ \t]*-{5,}\s*Original Message\s*-{5,}\s*$/im,  // "-----Original Message-----"
+  /^[ \t]*-{5,}\s*Forwarded Message\s*-{5,}\s*$/im, // "-----Forwarded Message-----"
+  /^[ \t]*From:\s.+\r?\n[ \t]*(?:Sent|Date):\s.+$/im, // Outlook's "From: ...\nSent/Date: ..." header block
+  /^[ \t]*On .{5,100} wrote:\s*$/im                 // Gmail/Apple Mail-style "On <date>, <name> wrote:"
 ];
 
 function trimQuotedReplyChain(bodyText) {

@@ -21,10 +21,17 @@ public partial class CaravanViewModel : ObservableObject
     [ObservableProperty] private string? _activeTagFilter;
     [ObservableProperty] private IEnumerable<ConversationDto> _visibleConversations = Enumerable.Empty<ConversationDto>();
     [ObservableProperty] private string _newTagText = string.Empty;
+    [ObservableProperty] private string _newSubject = string.Empty;
+    [ObservableProperty] private string _newType = "Call";
+    [ObservableProperty] private string _newDirection = "Outbound";
+    [ObservableProperty] private string _newBody = string.Empty;
 
     public ObservableCollection<JobDetailDto> Jobs { get; } = new();
     public ObservableCollection<DocumentItemViewModel> Documents { get; } = new();
     public ObservableCollection<ConversationDto> Conversations { get; } = new();
+
+    public static IReadOnlyList<string> TypeOptions { get; } = ["Call", "Email", "Note", "Meeting"];
+    public static IReadOnlyList<string> DirectionOptions { get; } = ["Outbound", "Inbound"];
 
     public CaravanViewModel(ApiClient api)
     {
@@ -169,6 +176,46 @@ public partial class CaravanViewModel : ObservableObject
         catch (Exception ex)
         {
             StatusText = $"Failed to add tag: {ex.Message}";
+        }
+    }
+
+    /// <summary>Logs a call, note, meeting, or manually-entered email against this caravan's customer —
+    /// so things that happen on the phone or in person don't get lost, same as inbound emails do.</summary>
+    [RelayCommand]
+    private async Task LogConversationAsync()
+    {
+        if (Caravan?.Customer is null) return;
+        if (string.IsNullOrWhiteSpace(NewSubject))
+        {
+            StatusText = "Enter a subject before logging.";
+            return;
+        }
+
+        try
+        {
+            ConversationDto conversation = await _api.CreateConversationAsync(new CreateConversationRequest
+            {
+                CustomerId = Caravan.Customer.Id,
+                RegistrationNumber = Caravan.RegistrationNumber,
+                Subject = NewSubject.Trim()
+            });
+
+            await _api.AddMessageAsync(conversation.Id, new LogMessageRequest
+            {
+                Type = NewType,
+                Direction = NewDirection,
+                Body = string.IsNullOrWhiteSpace(NewBody) ? null : NewBody.Trim(),
+                OccurredAt = DateTime.UtcNow
+            });
+
+            NewSubject = string.Empty;
+            NewBody = string.Empty;
+            StatusText = "Conversation logged.";
+            await LoadAsync(Caravan.RegistrationNumber);
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Failed to log conversation: {ex.Message}";
         }
     }
 

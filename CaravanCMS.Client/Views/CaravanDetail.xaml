@@ -357,12 +357,42 @@
                 </TabItem.Header>
 
                 <Grid Margin="0,12,0,0">
-                    <TextBlock Text="No conversations logged for this customer."
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Log a call, note, meeting, or manual email — so phone/in-person contact isn't lost -->
+                    <Border Grid.Row="0" Style="{StaticResource Card}" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Text="Log a call or note" Style="{StaticResource HeadingMedium}" Margin="0,0,0,8"/>
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="130"/>
+                                    <ColumnDefinition Width="130"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox Style="{StaticResource InputBox}" Margin="0,0,8,0"
+                                         Text="{Binding NewSubject, UpdateSourceTrigger=PropertyChanged}"/>
+                                <ComboBox Grid.Column="1" ItemsSource="{Binding TypeOptions}" SelectedItem="{Binding NewType}"
+                                          Margin="0,0,8,0" Padding="8,5" FontFamily="Segoe UI" FontSize="13"/>
+                                <ComboBox Grid.Column="2" ItemsSource="{Binding DirectionOptions}" SelectedItem="{Binding NewDirection}"
+                                          Padding="8,5" FontFamily="Segoe UI" FontSize="13"/>
+                            </Grid>
+                            <TextBox Style="{StaticResource InputBox}" AcceptsReturn="True" TextWrapping="Wrap"
+                                     Height="60" Margin="0,0,0,8"
+                                     Text="{Binding NewBody, UpdateSourceTrigger=PropertyChanged}"/>
+                            <Button Style="{StaticResource PrimaryButton}" Content="Log Conversation"
+                                    Command="{Binding LogConversationCommand}" HorizontalAlignment="Left" MinWidth="150"/>
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock Grid.Row="1" Text="No conversations logged for this customer."
                                Style="{StaticResource SubText}" HorizontalAlignment="Center"
                                VerticalAlignment="Center" FontSize="14"
                                Visibility="{Binding Conversations.Count, Converter={StaticResource ZeroToVis}}"/>
 
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                         <StackPanel>
                             <!-- Active filter banner -->
                             <Border Background="{StaticResource LightPink}" CornerRadius="4" Padding="10,6" Margin="0,0,0,10"

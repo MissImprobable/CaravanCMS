@@ -2,6 +2,7 @@ using CaravanCMS.Api.Data;
 using CaravanCMS.Core;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text.RegularExpressions;
 
 namespace CaravanCMS.Api.Controllers;
 
@@ -226,6 +227,68 @@ public class ConversationsController : ControllerBase
             .Select(t => new TagDto { Id = t.Id, Name = t.Name })
             .ToListAsync();
         return Ok(tags);
+    }
+
+    // Same quote-chain markers as the Outlook add-in's client-side trimmer (taskpane.js) — kept here
+    // too so this one-time cleanup can retroactively fix messages logged before that trimming existed.
+    // Each nesting level of a reply chain is indented with leading tabs/spaces (Apple/iPhone Mail does
+    // this heavily), so every marker tolerates leading [ \t]* rather than anchoring straight at ^.
+    private static readonly Regex[] ReplyChainPatterns =
+    [
+        new(@"^[ \t]*_{10,}\s*$", RegexOptions.Multiline),
+        new(@"^[ \t]*-{5,}\s*Original Message\s*-{5,}\s*$", RegexOptions.Multiline | RegexOptions.IgnoreCase),
+        new(@"^[ \t]*-{5,}\s*Forwarded Message\s*-{5,}\s*$", RegexOptions.Multiline | RegexOptions.IgnoreCase),
+        new(@"^[ \t]*From:\s.+\r?\n[ \t]*(?:Sent|Date):\s.+$", RegexOptions.Multiline | RegexOptions.IgnoreCase),
+        new(@"^[ \t]*On .{5,100} wrote:\s*$", RegexOptions.Multiline | RegexOptions.IgnoreCase)
+    ];
+
+    private static string TrimQuotedReplyChain(string bodyText)
+    {
+        int cutIndex = bodyText.Length;
+        foreach (Regex pattern in ReplyChainPatterns)
+        {
+            Match m = pattern.Match(bodyText);
+            if (m.Success && m.Index < cutIndex)
+                cutIndex = m.Index;
+        }
+        return bodyText[..cutIndex].TrimEnd();
+    }
+
+    /// <summary>
+    /// One-time retroactive cleanup: strips quoted reply/forward chains from message bodies that were
+    /// logged before the Outlook add-in trimmed them client-side, so old threads don't keep repeating
+    /// their entire history in every message row. Safe to re-run — already-trimmed bodies won't match.
+    /// </summary>
+    [HttpPost("cleanup-quoted-chains")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> CleanupQuotedChains()
+    {
+        List<CommunicationLog> messages = await _db.CommunicationLogs
+            .Where(m => m.Body != null && m.Body != "")
+            .ToListAsync();
+
+        int changed = 0;
+        long charsRemoved = 0;
+
+        foreach (CommunicationLog m in messages)
+        {
+            string trimmed = TrimQuotedReplyChain(m.Body!);
+            if (trimmed.Length < m.Body!.Length)
+            {
+                charsRemoved += m.Body.Length - trimmed.Length;
+                m.Body = trimmed;
+                changed++;
+            }
+        }
+
+        if (changed > 0)
+            await _db.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Quoted-chain cleanup — {Changed} of {Total} messages trimmed, {Chars:N0} characters removed",
+            changed, messages.Count, charsRemoved);
+
+        return Ok(new { totalMessagesScanned = messages.Count, messagesChanged = changed, charactersRemoved = charsRemoved });
     }
 
     private static ConversationDto MapToDto(Conversation c) => new()
