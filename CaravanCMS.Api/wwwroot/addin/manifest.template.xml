@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  CaravanCMS Outlook Add-in manifest — TEMPLATE, not served directly.
+
+  {{BASE_URL}} is filled in by the server at request time from the
+  CaravanCMS:PublicBaseUrl setting in appsettings.json — set that one value and every
+  URL below (icons, task pane, app domain) is generated from it automatically.
+  Fetch the rendered manifest from GET /addin/manifest.xml, not this file.
+
+  PublicBaseUrl must be a real, browser-reachable HTTPS address — Outlook will not load
+  an add-in over plain HTTP or a LAN hostname without a valid certificate, except when
+  sideloading directly on the machine running the API itself (https://localhost:PORT).
+-->
+<OfficeApp
+    xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+    xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
+    xsi:type="MailApp">
+
+  <Id>e1ec94e8-367f-474c-8589-cf51f4dfe592</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>Caravanland</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="CaravanCMS"/>
+  <Description DefaultValue="Log customer emails to CaravanCMS and link them to the right customer or caravan."/>
+  <IconUrl DefaultValue="{{BASE_URL}}/addin/assets/icon-32.png"/>
+  <HighResolutionIconUrl DefaultValue="{{BASE_URL}}/addin/assets/icon-80.png"/>
+  <SupportUrl DefaultValue="{{BASE_URL}}/"/>
+
+  <AppDomains>
+    <AppDomain>{{BASE_URL}}</AppDomain>
+  </AppDomains>
+
+  <Hosts>
+    <Host Name="Mailbox"/>
+  </Hosts>
+
+  <Requirements>
+    <Sets>
+      <Set Name="Mailbox" MinVersion="1.5"/>
+    </Sets>
+  </Requirements>
+
+  <FormSettings>
+    <Form xsi:type="ItemRead">
+      <DesktopSettings>
+        <SourceLocation DefaultValue="{{BASE_URL}}/addin/taskpane.html"/>
+        <RequestedHeight>250</RequestedHeight>
+      </DesktopSettings>
+    </Form>
+  </FormSettings>
+
+  <!-- Read-only access to the currently open item (subject, sender, body) — no send/modify capability -->
+  <Permissions>ReadItem</Permissions>
+
+  <Rule xsi:type="RuleCollection" Mode="Or">
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read"/>
+  </Rule>
+
+  <DisableEntityHighlighting>false</DisableEntityHighlighting>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Requirements>
+      <bt:Sets DefaultMinVersion="1.5">
+        <bt:Set Name="Mailbox"/>
+      </bt:Sets>
+    </Requirements>
+    <Hosts>
+      <Host xsi:type="MailHost">
+        <DesktopFormFactor>
+          <FunctionFile resid="Commands.Url"/>
+
+          <ExtensionPoint xsi:type="MessageReadCommandSurface">
+            <OfficeTab id="TabDefault">
+              <Group id="CaravanCMS.Group">
+                <Label resid="Group.Label"/>
+                <Control xsi:type="Button" id="CaravanCMS.TaskpaneButton">
+                  <Label resid="TaskpaneButton.Label"/>
+                  <Supertip>
+                    <Title resid="TaskpaneButton.Title"/>
+                    <Description resid="TaskpaneButton.Tooltip"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16"/>
+                    <bt:Image size="32" resid="Icon.32"/>
+                    <bt:Image size="80" resid="Icon.80"/>
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <SourceLocation resid="Taskpane.Url"/>
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16" DefaultValue="{{BASE_URL}}/addin/assets/icon-16.png"/>
+        <bt:Image id="Icon.32" DefaultValue="{{BASE_URL}}/addin/assets/icon-32.png"/>
+        <bt:Image id="Icon.80" DefaultValue="{{BASE_URL}}/addin/assets/icon-80.png"/>
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="Commands.Url" DefaultValue="{{BASE_URL}}/addin/taskpane.html"/>
+        <bt:Url id="Taskpane.Url" DefaultValue="{{BASE_URL}}/addin/taskpane.html"/>
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="Group.Label" DefaultValue="CaravanCMS"/>
+        <bt:String id="TaskpaneButton.Label" DefaultValue="CaravanCMS"/>
+        <bt:String id="TaskpaneButton.Title" DefaultValue="Open CaravanCMS"/>
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Pin this pane open (use the pin icon in the pane's top-right corner) to auto-log emails from known customers, or manually attach an email to a customer or caravan."/>
+      </bt:LongStrings>
+    </Resources>
+
+    <!--
+      v1.1 override — required only to add SupportsPinning to the taskpane button. Duplicates the
+      whole MessageReadCommandSurface command from the v1.0 block above by design: the v1.1 schema
+      fully redefines the command surface for clients that understand it, it isn't a delta/patch.
+      Clients too old for v1.1 keep using the v1.0 block above (no pin support, same as before).
+      See https://learn.microsoft.com/en-us/office/dev/add-ins/outlook/pinnable-taskpane
+    -->
+    <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1" xsi:type="VersionOverridesV1_1">
+      <Requirements>
+        <bt:Sets DefaultMinVersion="1.5">
+          <bt:Set Name="Mailbox"/>
+        </bt:Sets>
+      </Requirements>
+      <Hosts>
+        <Host xsi:type="MailHost">
+          <DesktopFormFactor>
+            <FunctionFile resid="Commands.Url"/>
+            <ExtensionPoint xsi:type="MessageReadCommandSurface">
+              <OfficeTab id="TabDefault">
+                <Group id="CaravanCMS.Group">
+                  <Label resid="Group.Label"/>
+                  <Control xsi:type="Button" id="CaravanCMS.TaskpaneButton">
+                    <Label resid="TaskpaneButton.Label"/>
+                    <Supertip>
+                      <Title resid="TaskpaneButton.Title"/>
+                      <Description resid="TaskpaneButton.Tooltip"/>
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="Icon.16"/>
+                      <bt:Image size="32" resid="Icon.32"/>
+                      <bt:Image size="80" resid="Icon.80"/>
+                    </Icon>
+                    <Action xsi:type="ShowTaskpane">
+                      <SourceLocation resid="Taskpane.Url"/>
+                      <SupportsPinning>true</SupportsPinning>
+                    </Action>
+                  </Control>
+                </Group>
+              </OfficeTab>
+            </ExtensionPoint>
+          </DesktopFormFactor>
+        </Host>
+      </Hosts>
+      <Resources>
+        <bt:Images>
+          <bt:Image id="Icon.16" DefaultValue="{{BASE_URL}}/addin/assets/icon-16.png"/>
+          <bt:Image id="Icon.32" DefaultValue="{{BASE_URL}}/addin/assets/icon-32.png"/>
+          <bt:Image id="Icon.80" DefaultValue="{{BASE_URL}}/addin/assets/icon-80.png"/>
+        </bt:Images>
+        <bt:Urls>
+          <bt:Url id="Commands.Url" DefaultValue="{{BASE_URL}}/addin/taskpane.html"/>
+          <bt:Url id="Taskpane.Url" DefaultValue="{{BASE_URL}}/addin/taskpane.html"/>
+        </bt:Urls>
+        <bt:ShortStrings>
+          <bt:String id="Group.Label" DefaultValue="CaravanCMS"/>
+          <bt:String id="TaskpaneButton.Label" DefaultValue="CaravanCMS"/>
+          <bt:String id="TaskpaneButton.Title" DefaultValue="Open CaravanCMS"/>
+        </bt:ShortStrings>
+        <bt:LongStrings>
+          <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Pin this pane open (use the pin icon in the pane's top-right corner) to auto-log emails from known customers, or manually attach an email to a customer or caravan."/>
+        </bt:LongStrings>
+      </Resources>
+    </VersionOverrides>
+  </VersionOverrides>
+</OfficeApp>
