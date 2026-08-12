@@ -5,6 +5,8 @@ using CommunityToolkit.Mvvm.Input;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
+using System.Text;
 
 namespace CaravanCMS.Client.ViewModels;
 
@@ -300,6 +302,201 @@ public partial class CaravanViewModel : ObservableObject
             StatusText = $"Failed to add message: {ex.Message}";
         }
     }
+
+    /// <summary>Zips every document (grouped the same way the Documents tab groups them) plus text
+    /// exports of the vehicle info, job history, and full conversation log, then opens it as an Outlook
+    /// draft attachment for review. Nothing is sent until a person hits Send in Outlook themselves.</summary>
+    public async Task PackageAndSendAsync(string recipient)
+    {
+        if (Caravan is null) return;
+
+        StatusText = "Building package...";
+        string zipPath = Path.Combine(Path.GetTempPath(), $"{Caravan.RegistrationNumber}-history-{DateTime.Now:yyyyMMdd-HHmmss}.zip");
+        try
+        {
+            await BuildZipAsync(zipPath, Documents, new Dictionary<string, string>
+            {
+                ["Vehicle Info.txt"] = FormatVehicleInfoText(),
+                ["Job History.txt"] = FormatJobHistoryText(),
+                ["Conversations.txt"] = FormatAllConversationsText()
+            });
+
+            OutlookEmailService.OpenDraft(
+                recipient,
+                subject: $"{Caravan.RegistrationNumber} — Full History",
+                body: $"Attached: complete history for {Caravan.Year} {Caravan.Make} {Caravan.Model} ({Caravan.RegistrationNumber}).",
+                attachmentPaths: [zipPath]);
+
+            StatusText = "Draft opened in Outlook.";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Failed to build package: {ex.Message}";
+        }
+        finally
+        {
+            TryDeleteFile(zipPath);
+        }
+    }
+
+    /// <summary>Zips just the documents under one type group (Major Jobs, Self Containment, etc.),
+    /// preserving the same source-folder sub-grouping shown in the Documents tab, and opens it as an
+    /// Outlook draft attachment.</summary>
+    public async Task SendDocumentTypeCopyAsync(string documentType, string recipient)
+    {
+        if (Caravan is null) return;
+
+        StatusText = $"Building {documentType} package...";
+        string zipPath = Path.Combine(Path.GetTempPath(), $"{Caravan.RegistrationNumber}-{documentType}-{DateTime.Now:yyyyMMdd-HHmmss}.zip");
+        try
+        {
+            List<DocumentItemViewModel> docs = Documents.Where(d => d.DocumentType == documentType).ToList();
+            await BuildZipAsync(zipPath, docs, textEntries: []);
+
+            OutlookEmailService.OpenDraft(
+                recipient,
+                subject: $"{Caravan.RegistrationNumber} — {documentType}",
+                body: $"Attached: {documentType} documents for {Caravan.Year} {Caravan.Make} {Caravan.Model} ({Caravan.RegistrationNumber}).",
+                attachmentPaths: [zipPath]);
+
+            StatusText = "Draft opened in Outlook.";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Failed to build package: {ex.Message}";
+        }
+        finally
+        {
+            TryDeleteFile(zipPath);
+        }
+    }
+
+    /// <summary>Opens an Outlook draft with a conversation's full message history formatted as
+    /// readable plain text directly in the email body — no attachment needed, so the recipient
+    /// (an insurer, a customer following up) can read it without opening anything.</summary>
+    public void SendConversationCopy(ConversationDto conversation, string recipient)
+    {
+        if (Caravan is null) return;
+
+        OutlookEmailService.OpenDraft(
+            recipient,
+            subject: $"{Caravan.RegistrationNumber} — {conversation.Subject ?? "Conversation"}",
+            body: FormatConversationText(conversation));
+
+        StatusText = "Draft opened in Outlook.";
+    }
+
+    private async Task BuildZipAsync(string zipPath, IEnumerable<DocumentItemViewModel> docs, Dictionary<string, string> textEntries)
+    {
+        using FileStream fileStream = new(zipPath, FileMode.Create);
+        using ZipArchive archive = new(fileStream, ZipArchiveMode.Create);
+
+        foreach (DocumentItemViewModel doc in docs)
+        {
+            byte[] bytes = await _api.DownloadDocumentAsync(doc.Doc.Id);
+            string folder = string.IsNullOrWhiteSpace(doc.Category) ? "Other documents" : SanitizePathSegment(doc.Category);
+            string entryPath = $"{SanitizePathSegment(doc.DocumentType ?? "Document")}/{folder}/{SanitizePathSegment(doc.FileName)}";
+            ZipArchiveEntry entry = archive.CreateEntry(entryPath, CompressionLevel.Optimal);
+            using Stream entryStream = entry.Open();
+            await entryStream.WriteAsync(bytes);
+        }
+
+        foreach ((string fileName, string content) in textEntries)
+        {
+            ZipArchiveEntry entry = archive.CreateEntry(fileName, CompressionLevel.Optimal);
+            using StreamWriter writer = new(entry.Open(), Encoding.UTF8);
+            await writer.WriteAsync(content);
+        }
+    }
+
+    private static string SanitizePathSegment(string value)
+    {
+        foreach (char c in Path.GetInvalidFileNameChars())
+            value = value.Replace(c, '_');
+        return value;
+    }
+
+    private static void TryDeleteFile(string path)
+    {
+        try { if (File.Exists(path)) File.Delete(path); } catch { /* best effort — leaves a stray temp file at worst */ }
+    }
+
+    private string FormatVehicleInfoText()
+    {
+        if (Caravan is null) return string.Empty;
+        StringBuilder sb = new();
+        sb.AppendLine($"{Caravan.Year} {Caravan.Make} {Caravan.Model}");
+        sb.AppendLine($"Registration: {Caravan.RegistrationNumber}");
+        sb.AppendLine($"VIN: {Caravan.Vin}");
+        sb.AppendLine();
+        sb.AppendLine($"WOF: issued {FormatDate(Caravan.WofIssueDate)}, due {FormatDate(Caravan.WofDueDate)}");
+        sb.AppendLine($"WOF Electrical: issued {FormatDate(Caravan.ElectricalWofIssueDate)}, due {FormatDate(Caravan.ElectricalWofDueDate)}");
+        sb.AppendLine($"Self Containment: issued {FormatDate(Caravan.SelfContainmentIssueDate)}, due {FormatDate(Caravan.SelfContainmentDue)}");
+        sb.AppendLine();
+        if (Caravan.Customer is { } customer)
+        {
+            sb.AppendLine($"Owner: {customer.Name}");
+            sb.AppendLine($"Email: {customer.Email}");
+            sb.AppendLine($"Phone: {customer.Phone}");
+            sb.AppendLine($"Address: {customer.Address}, {customer.Suburb} {customer.Postcode}".Trim());
+        }
+        if (!string.IsNullOrWhiteSpace(Caravan.Notes))
+        {
+            sb.AppendLine();
+            sb.AppendLine($"Notes: {Caravan.Notes}");
+        }
+        return sb.ToString();
+    }
+
+    private string FormatJobHistoryText()
+    {
+        StringBuilder sb = new();
+        foreach (JobDetailDto job in VisibleJobs)
+        {
+            sb.AppendLine($"Job #{job.JobNumber} — {job.JobType} — {job.Status}");
+            sb.AppendLine($"Finished {FormatDate(job.FinishDate)} by {job.FinishedBy}");
+            if (!string.IsNullOrWhiteSpace(job.Description)) sb.AppendLine(job.Description);
+            if (!string.IsNullOrWhiteSpace(job.Notes)) sb.AppendLine($"Notes: {job.Notes}");
+            foreach (InvoiceDto invoice in job.Invoices)
+            {
+                sb.AppendLine($"  Invoice #{invoice.InvoiceNumber} — {FormatDate(invoice.IssueDate)} — Total ${invoice.TotalAmount:F2}");
+                foreach (InvoiceItemDto item in invoice.Items)
+                    sb.AppendLine($"    {item.Description} x{item.Quantity}");
+            }
+            sb.AppendLine(new string('-', 60));
+        }
+        return sb.ToString();
+    }
+
+    private string FormatAllConversationsText()
+    {
+        StringBuilder sb = new();
+        foreach (ConversationDto conversation in Conversations)
+        {
+            sb.Append(FormatConversationText(conversation));
+            sb.AppendLine(new string('=', 60));
+            sb.AppendLine();
+        }
+        return sb.ToString();
+    }
+
+    private static string FormatConversationText(ConversationDto conversation)
+    {
+        StringBuilder sb = new();
+        sb.AppendLine(conversation.Subject ?? "(No subject)");
+        if (conversation.Tags.Count > 0)
+            sb.AppendLine($"Tags: {string.Join(", ", conversation.Tags.Select(t => t.Name))}");
+        sb.AppendLine();
+        foreach (CommunicationLogDto message in conversation.Messages.OrderBy(m => m.OccurredAt))
+        {
+            sb.AppendLine($"[{message.Direction}] {message.FromAddress} — {message.OccurredAt:dd MMM yyyy HH:mm}");
+            sb.AppendLine(message.Body ?? string.Empty);
+            sb.AppendLine();
+        }
+        return sb.ToString();
+    }
+
+    private static string FormatDate(DateTime? date) => date?.ToString("dd MMM yyyy") ?? "—";
 
     /// <summary>Persists edits made on the Vehicle Info tab (vehicle fields, WOF/electrical/self-containment dates, keys, notes).</summary>
     [RelayCommand]

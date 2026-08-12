@@ -45,6 +45,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel>
                     <TextBlock FontFamily="Segoe UI" FontSize="20" FontWeight="Bold" Foreground="White">
@@ -69,6 +70,9 @@
                                FontFamily="Segoe UI" FontSize="12" Foreground="#FFDDEE"
                                HorizontalAlignment="Right"/>
                 </StackPanel>
+                <Button Grid.Column="2" Content="📦 Package and Send" Margin="20,0,0,0"
+                        VerticalAlignment="Center" Style="{StaticResource HeaderButton}"
+                        Click="PackageAndSend_Click"/>
             </Grid>
         </Border>
 
@@ -391,13 +395,20 @@
                                                              give the total file count recursed across all of them. -->
                                                         <Expander IsExpanded="False" Margin="0,10,0,0">
                                                             <Expander.Header>
-                                                                <TextBlock Foreground="{StaticResource DeepPink}"
-                                                                           FontSize="13" FontWeight="SemiBold">
-                                                                    <Run Text="{Binding Name, Mode=OneWay}"/>
-                                                                    <Run Text=" ("/>
-                                                                    <Run Text="{Binding Items.Count, Mode=OneWay}"/>
-                                                                    <Run Text=")"/>
-                                                                </TextBlock>
+                                                                <StackPanel Orientation="Horizontal">
+                                                                    <TextBlock Foreground="{StaticResource DeepPink}"
+                                                                               FontSize="13" FontWeight="SemiBold"
+                                                                               VerticalAlignment="Center">
+                                                                        <Run Text="{Binding Name, Mode=OneWay}"/>
+                                                                        <Run Text=" ("/>
+                                                                        <Run Text="{Binding Items.Count, Mode=OneWay}"/>
+                                                                        <Run Text=")"/>
+                                                                    </TextBlock>
+                                                                    <Button Content="✉ Send a Copy" FontSize="11" Margin="12,0,0,0"
+                                                                            Style="{StaticResource SecondaryButton}" Padding="8,3"
+                                                                            Tag="{Binding Name}"
+                                                                            Click="SendDocumentTypeCopy_Click"/>
+                                                                </StackPanel>
                                                             </Expander.Header>
                                                             <ItemsPresenter Margin="0,8,0,0"/>
                                                         </Expander>
@@ -596,6 +607,7 @@
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*"/>
                                                         <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="Auto"/>
                                                     </Grid.ColumnDefinitions>
                                                     <StackPanel Cursor="Hand">
                                                         <StackPanel.InputBindings>
@@ -613,8 +625,12 @@
                                                         </TextBlock>
                                                     </StackPanel>
 
+                                                    <Button Grid.Column="1" Content="✉ Send a Copy" FontSize="11" Margin="8,0"
+                                                            Style="{StaticResource SecondaryButton}" Padding="8,3" VerticalAlignment="Top"
+                                                            Tag="{Binding}" Click="SendConversationCopy_Click"/>
+
                                                     <!-- Tag chips -->
-                                                    <ItemsControl Grid.Column="1" ItemsSource="{Binding Tags}" VerticalAlignment="Top">
+                                                    <ItemsControl Grid.Column="2" ItemsSource="{Binding Tags}" VerticalAlignment="Top">
                                                         <ItemsControl.ItemsPanel>
                                                             <ItemsPanelTemplate>
                                                                 <StackPanel Orientation="Horizontal"/>

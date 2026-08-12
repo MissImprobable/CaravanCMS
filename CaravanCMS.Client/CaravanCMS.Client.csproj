@@ -21,6 +21,11 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
+    <!-- Drives desktop Outlook via COM to open a reviewable draft (attachments/body pre-filled,
+         nothing sent until a person clicks Send in Outlook itself) for "Package and Send" / "Send a
+         Copy". Requires classic desktop Outlook installed on the PC — already true here, it's the
+         same client the Outlook add-in targets. -->
+    <PackageReference Include="Microsoft.Office.Interop.Outlook" Version="15.0.4797.1004" />
   </ItemGroup>
 
   <ItemGroup>

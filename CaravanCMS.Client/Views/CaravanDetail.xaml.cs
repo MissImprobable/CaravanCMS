@@ -49,6 +49,43 @@ public partial class CaravanDetailWindow : Window
         _vm.RefreshCaravanDisplay();
     }
 
+    /// <summary>Prompts for a recipient, then zips the caravan's entire history (all documents, plus
+    /// text exports of vehicle info, job history, and conversations) and opens it as an Outlook draft.</summary>
+    private async void PackageAndSend_Click(object sender, RoutedEventArgs e)
+    {
+        string? recipient = PromptDialog.Show(this, "Package and Send",
+            $"Send the complete history for {_vm.Caravan?.RegistrationNumber} to:");
+        if (recipient is null) return;
+
+        await _vm.PackageAndSendAsync(recipient);
+    }
+
+    /// <summary>Prompts for a recipient, then zips just the documents under one type group
+    /// (the Tag holds the DocumentType, set from the group's Name in XAML) and opens it as an
+    /// Outlook draft. Marks the event handled so the click doesn't also toggle the parent Expander.</summary>
+    private async void SendDocumentTypeCopy_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        string documentType = (string)((Button)sender).Tag;
+        string? recipient = PromptDialog.Show(this, "Send a Copy",
+            $"Send \"{documentType}\" documents to:");
+        if (recipient is null) return;
+
+        await _vm.SendDocumentTypeCopyAsync(documentType, recipient);
+    }
+
+    /// <summary>Prompts for a recipient, then opens an Outlook draft with the conversation's full
+    /// message history as plain text in the body (the Tag holds the ConversationDto).</summary>
+    private void SendConversationCopy_Click(object sender, RoutedEventArgs e)
+    {
+        ConversationDto conversation = (ConversationDto)((Button)sender).Tag;
+        string? recipient = PromptDialog.Show(this, "Send a Copy",
+            $"Send \"{conversation.Subject ?? "this conversation"}\" to:");
+        if (recipient is null) return;
+
+        _vm.SendConversationCopy(conversation, recipient);
+    }
+
     /// <summary>Flips the Documents list between newest-first and oldest-first within each type group.
     /// Lives in code-behind (rather than the ViewModel) because it operates on the GroupedDocs
     /// CollectionViewSource, a WPF-specific view over the ViewModel's plain Documents collection.</summary>
