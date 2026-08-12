@@ -14,14 +14,20 @@
         <local:NullToVisibilityConverter x:Key="NullToVis"/>
         <local:MimeTypeToIconConverter x:Key="MimeToIcon"/>
         <local:ZeroToVisibilityConverter x:Key="ZeroToVis"/>
+        <local:NonZeroToVisibilityConverter x:Key="NonZeroToVis"/>
         <local:EqualityToVisibilityConverter x:Key="EqualityToVis"/>
+        <local:CategoryGroupNameConverter x:Key="CategoryGroupName"/>
         <CollectionViewSource x:Key="GroupedDocs" Source="{Binding Documents}">
             <CollectionViewSource.GroupDescriptions>
                 <PropertyGroupDescription PropertyName="DocumentType"/>
+                <!-- Category holds the source import folder ("2024 - Roger Kidd") — sub-grouping on it
+                     bundles a job's PDF and photos together instead of listing them as unrelated rows. -->
+                <PropertyGroupDescription PropertyName="Category" Converter="{StaticResource CategoryGroupName}"/>
             </CollectionViewSource.GroupDescriptions>
             <CollectionViewSource.SortDescriptions>
                 <scm:SortDescription PropertyName="DocumentType"/>
                 <scm:SortDescription PropertyName="Category"/>
+                <scm:SortDescription PropertyName="UploadedDate" Direction="Descending"/>
             </CollectionViewSource.SortDescriptions>
         </CollectionViewSource>
     </Window.Resources>
@@ -137,7 +143,8 @@
                                 <StackPanel>
                                     <TextBlock Text="Warrant of Fitness" Style="{StaticResource HeadingMedium}" Margin="0,0,0,12"/>
                                     <TextBlock Text="Issue Date" Style="{StaticResource SubText}" Margin="0,0,0,2"/>
-                                    <DatePicker SelectedDate="{Binding Caravan.WofIssueDate}" Margin="0,0,0,10" HorizontalAlignment="Stretch"/>
+                                    <DatePicker x:Name="WofIssueDatePicker" SelectedDate="{Binding Caravan.WofIssueDate}"
+                                                Margin="0,0,0,10" HorizontalAlignment="Stretch"/>
                                     <TextBlock Text="Due Date" Style="{StaticResource SubText}" Margin="0,0,0,2"/>
                                     <DatePicker SelectedDate="{Binding Caravan.WofDueDate}" HorizontalAlignment="Stretch"/>
                                 </StackPanel>
@@ -145,7 +152,8 @@
                                 <StackPanel Grid.Column="1" Margin="24,0,0,0">
                                     <TextBlock Text="Warrant of Electrical Fitness" Style="{StaticResource HeadingMedium}" Margin="0,0,0,12"/>
                                     <TextBlock Text="Issue Date" Style="{StaticResource SubText}" Margin="0,0,0,2"/>
-                                    <DatePicker SelectedDate="{Binding Caravan.ElectricalWofIssueDate}" Margin="0,0,0,10" HorizontalAlignment="Stretch"/>
+                                    <DatePicker x:Name="ElectricalWofIssueDatePicker" SelectedDate="{Binding Caravan.ElectricalWofIssueDate}"
+                                                Margin="0,0,0,10" HorizontalAlignment="Stretch"/>
                                     <TextBlock Text="Due Date" Style="{StaticResource SubText}" Margin="0,0,0,2"/>
                                     <DatePicker SelectedDate="{Binding Caravan.ElectricalWofDueDate}" HorizontalAlignment="Stretch"/>
                                 </StackPanel>
@@ -153,7 +161,8 @@
                                 <StackPanel Grid.Column="2" Margin="24,0,0,0">
                                     <TextBlock Text="Self Containment" Style="{StaticResource HeadingMedium}" Margin="0,0,0,12"/>
                                     <TextBlock Text="Issue Date" Style="{StaticResource SubText}" Margin="0,0,0,2"/>
-                                    <DatePicker SelectedDate="{Binding Caravan.SelfContainmentIssueDate}" Margin="0,0,0,10" HorizontalAlignment="Stretch"/>
+                                    <DatePicker x:Name="SelfContainmentIssueDatePicker" SelectedDate="{Binding Caravan.SelfContainmentIssueDate}"
+                                                Margin="0,0,0,10" HorizontalAlignment="Stretch"/>
                                     <TextBlock Text="Due Date" Style="{StaticResource SubText}" Margin="0,0,0,2"/>
                                     <DatePicker SelectedDate="{Binding Caravan.SelfContainmentDue}" HorizontalAlignment="Stretch"/>
                                 </StackPanel>
@@ -216,8 +225,31 @@
                     </TextBlock>
                 </TabItem.Header>
 
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,12,0,0">
-                    <ItemsControl ItemsSource="{Binding Jobs}">
+                <Grid Margin="0,12,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,10"
+                                Visibility="{Binding Jobs.Count, Converter={StaticResource NonZeroToVis}}">
+                        <Button FontSize="12"
+                                Command="{Binding ToggleJobSortCommand}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                                    <Setter Property="Content" Value="⬇ Newest first"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding JobsNewestFirst}" Value="False">
+                                            <Setter Property="Content" Value="⬆ Oldest first"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </StackPanel>
+
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding VisibleJobs}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <Grid Margin="0,0,0,4">
@@ -311,6 +343,7 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </ScrollViewer>
+                </Grid>
             </TabItem>
 
             <!-- Documents tab -->
@@ -324,23 +357,86 @@
                 </TabItem.Header>
 
                 <Grid Margin="0,12,0,0">
-                    <TextBlock Text="No documents linked to this caravan."
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,10"
+                                Visibility="{Binding Documents.Count, Converter={StaticResource NonZeroToVis}}">
+                        <Button Content="⬇ Newest first" FontSize="12" Style="{StaticResource SecondaryButton}"
+                                Click="ToggleDocumentSort_Click"/>
+                    </StackPanel>
+
+                    <TextBlock Grid.Row="1" Text="No documents linked to this caravan."
                                Style="{StaticResource SubText}" HorizontalAlignment="Center"
                                VerticalAlignment="Center" FontSize="14"
                                Visibility="{Binding Documents.Count, Converter={StaticResource ZeroToVis}}"/>
 
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                         <ItemsControl ItemsSource="{Binding Source={StaticResource GroupedDocs}}">
                             <ItemsControl.GroupStyle>
                                 <GroupStyle>
-                                    <GroupStyle.HeaderTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding Name}"
-                                                       Foreground="{StaticResource DeepPink}"
-                                                       FontSize="13" FontWeight="SemiBold"
-                                                       Margin="0,16,0,4"/>
-                                        </DataTemplate>
-                                    </GroupStyle.HeaderTemplate>
+                                    <GroupStyle.ContainerStyle>
+                                        <Style TargetType="{x:Type GroupItem}">
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="{x:Type GroupItem}">
+                                                        <!-- Collapsed by default so staff can jump straight to the
+                                                             document type (Major Jobs, Self Containment, etc.)
+                                                             they're after instead of scrolling past everything.
+                                                             Header count is Items.Count, not ItemCount — this
+                                                             group's immediate children are the Category subgroups
+                                                             (one per job/quote folder), and ItemCount would instead
+                                                             give the total file count recursed across all of them. -->
+                                                        <Expander IsExpanded="False" Margin="0,10,0,0">
+                                                            <Expander.Header>
+                                                                <TextBlock Foreground="{StaticResource DeepPink}"
+                                                                           FontSize="13" FontWeight="SemiBold">
+                                                                    <Run Text="{Binding Name, Mode=OneWay}"/>
+                                                                    <Run Text=" ("/>
+                                                                    <Run Text="{Binding Items.Count, Mode=OneWay}"/>
+                                                                    <Run Text=")"/>
+                                                                </TextBlock>
+                                                            </Expander.Header>
+                                                            <ItemsPresenter Margin="0,8,0,0"/>
+                                                        </Expander>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </GroupStyle.ContainerStyle>
+                                </GroupStyle>
+                                <!-- Level 2: Category (the source import folder) — bundles a job's PDF and
+                                     photos into one visually-boxed unit instead of a flat file list. Not
+                                     independently collapsible; the type-level Expander above already hides
+                                     it until wanted. -->
+                                <GroupStyle>
+                                    <GroupStyle.ContainerStyle>
+                                        <Style TargetType="{x:Type GroupItem}">
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="{x:Type GroupItem}">
+                                                        <Border Background="{StaticResource LightPink}"
+                                                                BorderBrush="{StaticResource BorderPink}" BorderThickness="1"
+                                                                CornerRadius="4" Padding="10,8" Margin="0,6,0,0">
+                                                            <StackPanel>
+                                                                <TextBlock FontSize="11" FontWeight="SemiBold"
+                                                                           Foreground="{StaticResource TextSecondary}"
+                                                                           Margin="0,0,0,6">
+                                                                    <Run Text="{Binding Name, Mode=OneWay}"/>
+                                                                    <Run Text=" · "/>
+                                                                    <Run Text="{Binding ItemCount, Mode=OneWay}"/>
+                                                                    <Run Text=" file(s)"/>
+                                                                </TextBlock>
+                                                                <ItemsPresenter/>
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </GroupStyle.ContainerStyle>
                                 </GroupStyle>
                             </ItemsControl.GroupStyle>
                             <ItemsControl.ItemTemplate>
@@ -387,8 +483,7 @@
                                                 <TextBlock Text="{Binding FileName}"
                                                            Style="{StaticResource BodyText}" FontWeight="SemiBold"/>
                                                 <TextBlock Style="{StaticResource SubText}" Margin="0,3,0,0">
-                                                    <Run Text="{Binding Category, Mode=OneWay}"/>
-                                                    <Run Text=" · Added "/>
+                                                    <Run Text="Added "/>
                                                     <Run Text="{Binding UploadedDate, StringFormat='dd MMM yyyy', Mode=OneWay}"/>
                                                 </TextBlock>
                                                 <TextBlock Text="{Binding Notes}" Style="{StaticResource SubText}"
@@ -465,6 +560,23 @@
 
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                         <StackPanel>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,10"
+                                        Visibility="{Binding Conversations.Count, Converter={StaticResource NonZeroToVis}}">
+                                <Button FontSize="12"
+                                        Command="{Binding ToggleConversationSortCommand}">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                                            <Setter Property="Content" Value="⬇ Newest first"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ConversationsNewestFirst}" Value="False">
+                                                    <Setter Property="Content" Value="⬆ Oldest first"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                            </StackPanel>
+
                             <!-- Active filter banner -->
                             <Border Background="{StaticResource LightPink}" CornerRadius="4" Padding="10,6" Margin="0,0,0,10"
                                     Visibility="{Binding ActiveTagFilter, Converter={StaticResource NullToVis}}">

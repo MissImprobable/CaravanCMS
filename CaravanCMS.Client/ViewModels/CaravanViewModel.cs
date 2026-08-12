@@ -30,6 +30,9 @@ public partial class CaravanViewModel : ObservableObject
     [ObservableProperty] private string _newMessageBody = string.Empty;
     [ObservableProperty] private bool _isSavingVehicleInfo;
     [ObservableProperty] private string? _vehicleInfoStatus;
+    [ObservableProperty] private bool _conversationsNewestFirst = true;
+    [ObservableProperty] private bool _jobsNewestFirst = true;
+    [ObservableProperty] private IEnumerable<JobDetailDto> _visibleJobs = Enumerable.Empty<JobDetailDto>();
 
     public ObservableCollection<JobDetailDto> Jobs { get; } = new();
     public ObservableCollection<DocumentItemViewModel> Documents { get; } = new();
@@ -42,6 +45,11 @@ public partial class CaravanViewModel : ObservableObject
     {
         _api = api;
     }
+
+    /// <summary>Forces bound Caravan.* fields to re-read after an in-place mutation on the DTO —
+    /// CaravanDetailDto doesn't implement INotifyPropertyChanged itself, so a direct field change
+    /// (e.g. auto-computing a due date from an issue date) wouldn't otherwise reach the UI.</summary>
+    public void RefreshCaravanDisplay() => OnPropertyChanged(nameof(Caravan));
 
     public async Task LoadAsync(string rego)
     {
@@ -65,6 +73,7 @@ public partial class CaravanViewModel : ObservableObject
 
             foreach (JobDetailDto job in detail.Jobs)
                 Jobs.Add(job);
+            ApplyJobSort();
 
             foreach (DocumentDto doc in detail.Documents)
             {
@@ -156,11 +165,38 @@ public partial class CaravanViewModel : ObservableObject
         ApplyTagFilter();
     }
 
+    /// <summary>Flips the Conversations list between newest-first and oldest-first, ordered by last activity.</summary>
+    [RelayCommand]
+    private void ToggleConversationSort()
+    {
+        ConversationsNewestFirst = !ConversationsNewestFirst;
+        ApplyTagFilter();
+    }
+
     private void ApplyTagFilter()
     {
-        VisibleConversations = string.IsNullOrEmpty(ActiveTagFilter)
-            ? Conversations.ToList()
-            : Conversations.Where(c => c.Tags.Any(t => t.Name == ActiveTagFilter)).ToList();
+        IEnumerable<ConversationDto> filtered = string.IsNullOrEmpty(ActiveTagFilter)
+            ? Conversations
+            : Conversations.Where(c => c.Tags.Any(t => t.Name == ActiveTagFilter));
+
+        VisibleConversations = ConversationsNewestFirst
+            ? filtered.OrderByDescending(c => c.LastActivityAt).ToList()
+            : filtered.OrderBy(c => c.LastActivityAt).ToList();
+    }
+
+    /// <summary>Flips the Job History list between newest-first and oldest-first, ordered by finish date.</summary>
+    [RelayCommand]
+    private void ToggleJobSort()
+    {
+        JobsNewestFirst = !JobsNewestFirst;
+        ApplyJobSort();
+    }
+
+    private void ApplyJobSort()
+    {
+        VisibleJobs = JobsNewestFirst
+            ? Jobs.OrderByDescending(j => j.FinishDate).ToList()
+            : Jobs.OrderBy(j => j.FinishDate).ToList();
     }
 
     /// <summary>Adds a label to the currently-expanded conversation, creating the tag if it doesn't already exist.</summary>

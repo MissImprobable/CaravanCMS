@@ -6,64 +6,69 @@ Caravan service history management system for Caravanland. Centralises MechanicD
 
 ```
 CaravanCMS.Core        → Shared models and DTOs (no dependencies)
-CaravanCMS.Api         → ASP.NET Core 10 REST API + SQLite database (runs as a Windows tray app)
-CaravanCMS.Admin       → WPF app for importing and file scanning (server machine)
+CaravanCMS.Worker      → Cloudflare Worker (Hono) REST API + D1 database + R2 document storage
+CaravanCMS.Admin       → WPF app for importing and file scanning
 CaravanCMS.Client      → WPF app for viewing caravan history (all machines)
 ```
 
-All apps communicate with the API over HTTP. The API is the single source of truth — no direct database access from WPF apps.
+All apps communicate with the API over HTTPS at `https://api.caravanland.co.nz`. The Worker is the single source of truth — no direct database access from WPF apps. The Outlook add-in (task pane + manifest) is also served by the Worker, from `CaravanCMS.Worker/public/addin/`.
+
+> The original backend was a self-hosted ASP.NET Core app (`CaravanCMS.Api`) running as a Windows tray app on an office PC. It has been decommissioned and removed — everything now runs on Cloudflare.
 
 ## Prerequisites
 
-- .NET 10 SDK: https://dotnet.microsoft.com/download/dotnet/10
+- Node.js 20+ and npm
+- A Cloudflare account with access to the `caravancms-api` Worker, `caravancms` D1 database, and `caravancms-documents` R2 bucket
+- .NET 10 SDK (for the Admin/Client WPF apps): https://dotnet.microsoft.com/download/dotnet/10
 - Visual Studio 2022 v17.12+ (or VS Code with C# extension)
-- Windows 10/11 (all projects are Windows-only)
+- Windows 10/11 (the WPF apps are Windows-only; the Worker itself is platform-independent)
 
-## Quick Setup
+## Quick Setup — Worker (backend)
 
 ```powershell
-# 1. Restore packages
+cd CaravanCMS.Worker
+npm install
+
+# Local dev server (uses --local D1/R2 unless configured otherwise)
+npm run dev
+
+# Deploy to Cloudflare
+npm run deploy
+
+# Apply D1 migrations
+npm run d1:migrate:remote   # or d1:migrate:local for local dev
+```
+
+Configuration lives in `CaravanCMS.Worker/wrangler.toml`:
+
+```toml
+[vars]
+PUBLIC_BASE_URL = "https://api.caravanland.co.nz"   # used for the add-in manifest's {{BASE_URL}}
+```
+
+`API_KEY` is a secret, not a plain var — set it with:
+
+```powershell
+wrangler secret put API_KEY
+```
+
+## Quick Setup — WPF apps
+
+```powershell
 dotnet restore
-
-# 2. Start the API (creates caravan-cms.db automatically)
-cd CaravanCMS.Api
-dotnet run
 ```
 
-The API launches as a **Windows system tray application**. A tray icon appears in the notification area with a context menu to open Swagger UI, stop/start the API, or exit. Double-clicking the tray icon opens Swagger.
-
-The database file `caravan-cms.db` is created automatically in the API's working directory on first run. New columns added in later versions are applied automatically on startup without needing a migration.
-
-Verify the API is running at `http://localhost:5000/swagger`.
-
-## Configuration
-
-Edit `CaravanCMS.Api/appsettings.json`:
-
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "Data Source=caravan-cms.db"
-  },
-  "CaravanCMS": {
-    "ApiKey": "your-secret-key-here",
-    "CaravanHistoryPath": "C:\\Users\\info\\OneDrive - Caravanland\\Documents\\Caravan History",
-    "MaxUploadSizeMB": 100
-  }
-}
-```
-
-> **Important:** Change `ApiKey` from the default before deploying. The same key must be entered in the Admin and Client app settings.
+Open `CaravanCMS.Client` or `CaravanCMS.Admin` settings and enter the server URL (`https://api.caravanland.co.nz`) and the API key. Both apps' `ApiClient.cs` set `PropertyNamingPolicy = JsonNamingPolicy.CamelCase` on their JSON options — required because the Worker does plain case-sensitive JSON parsing (see the `outlook-addin` skill for more on this gotcha).
 
 ## API Authentication
 
-All endpoints require the `X-API-Key` header:
+All `/api/*` endpoints require the `X-API-Key` header:
 
 ```
 X-API-Key: your-secret-key-here
 ```
 
-Returns `401 Unauthorized` if missing or incorrect. Swagger UI is excluded from authentication.
+Returns `401 Unauthorized` if missing or incorrect. `/health` and `/addin/*` are unauthenticated.
 
 ## Key Endpoints
 
@@ -73,13 +78,16 @@ Returns `401 Unauthorized` if missing or incorrect. Swagger UI is excluded from 
 | GET | `/api/caravans/{rego}` | Full detail with history (keyed by registration number) |
 | GET | `/api/caravans/search?q=term` | Search by VIN, rego, make/model, or customer name |
 | GET | `/api/caravans/stats` | Dashboard stats |
+| GET | `/api/customers/lookup?email=` | Customer match by email (used by the Outlook add-in) |
+| POST | `/api/conversations` | Start/append to a conversation thread (idempotent by `externalConversationId`) |
+| POST | `/api/conversations/{id}/messages` | Log a message against a conversation |
+| POST | `/api/conversations/{id}/tags` | Attach a label to a conversation |
 | POST | `/api/import/mechanicdesk` | Upload MechanicDesk Excel (.xlsx only) |
 | POST | `/api/import/scan-files` | Scan folder for documents |
-| POST | `/api/import/link-document` | Link file to caravan |
-| GET | `/api/documents/{id}/download` | Stream file to client |
+| POST | `/api/documents` | Upload a document (multipart), stored in R2 |
+| GET | `/api/documents/{id}/download` | Stream file from R2 |
 | GET | `/health` | Health check (unauthenticated) |
-
-Full documentation at `http://localhost:5000/swagger`.
+| GET | `/addin/manifest.xml` | Outlook add-in manifest (unauthenticated, renders `manifest.template.xml`) |
 
 ## MechanicDesk Import
 
@@ -100,31 +108,11 @@ The scanner walks the Caravan History folder and matches files to caravans using
 | 3 | VIN/reg found in folder path | 72% |
 | 4 | Fuzzy make/model match | 35–60% |
 
-Files with ≥50% confidence are auto-selected for linking. Review and override before confirming.
+Files with ≥50% confidence are auto-selected for linking. Review and override before confirming. Matched files are uploaded into R2 via `POST /api/documents`, resized in-Worker for images (see `CaravanCMS.Worker/src/lib/imageResize.ts`).
 
-## EPPlus Licensing
+## Outlook Add-in
 
-This project uses EPPlus for Excel parsing, configured as `LicenseContext.NonCommercial`. For a business deployment, you should purchase a commercial license at https://epplussoftware.com/en/LicenseOverview.
-
-## Logging
-
-Logs are written to:
-- Console (coloured, timestamped)
-- `logs/caravan-cms-YYYY-MM-DD.log` (rolling daily, 30 days retained)
-
-EF Core SQL queries are logged at Debug level (Development only).
-
-## Database Schema Changes
-
-The database is created automatically via `EnsureCreated()` on first run. New columns are added at startup via `ApplyColumnAdditions` in `Program.cs` — no manual migration step is needed when pulling updates.
-
-To add new EF entities or tables, use migrations:
-
-```powershell
-cd CaravanCMS.Api
-dotnet ef migrations add YourMigrationName
-dotnet ef database update
-```
+Task pane + manifest live in `CaravanCMS.Worker/public/addin/` and are served directly by the Worker's static assets binding, plus the templated `/addin/manifest.xml` route. See the `outlook-addin` Claude Code skill (`.claude/skills/outlook-addin/`) for deployment (Microsoft 365 admin center → Integrated apps) and troubleshooting.
 
 ## Project Structure
 
@@ -132,25 +120,21 @@ dotnet ef database update
 CaravanCMS/
 ├── CaravanCMS.Core/
 │   └── Models.cs                  # All entities and DTOs
-├── CaravanCMS.Api/
-│   ├── Data/ApplicationDbContext.cs
-│   ├── Controllers/
-│   │   ├── CaravansController.cs
-│   │   ├── JobsController.cs
-│   │   ├── DocumentsController.cs
-│   │   └── ImportController.cs
-│   ├── Services/
-│   │   ├── ExcelImportService.cs  # MechanicDesk Excel parser
-│   │   ├── FileScanner.cs         # Folder walk + document linking
-│   │   └── FuzzyMatcher.cs        # Caravan-to-file matching
-│   ├── Middleware/ApiKeyMiddleware.cs
-│   └── TrayApplicationContext.cs  # Windows tray icon + API lifecycle
+├── CaravanCMS.Worker/
+│   ├── src/
+│   │   ├── index.ts               # Route mounting, manifest.xml, health check
+│   │   ├── routes/                # caravans, customers, conversations, documents, jobs, import
+│   │   ├── lib/                   # mappers, fuzzy matching, image resize, reply-chain trimming
+│   │   └── middleware/apiKey.ts
+│   ├── public/addin/              # Outlook add-in task pane (html/js/css) + manifest template
+│   ├── migrations/                # D1 schema migrations
+│   └── scripts/                   # one-off migration/import scripts
 ├── CaravanCMS.Admin/
 │   ├── Views/                     # Import, Scan, Settings dialogs
 │   ├── ViewModels/                # MVVM logic
 │   └── Services/                  # ApiClient, SettingsService
 └── CaravanCMS.Client/
-    ├── Views/                     # CaravanDetail (Info/Jobs/Docs tabs)
+    ├── Views/                     # CaravanDetail (Info/Jobs/Documents/Conversations tabs)
     ├── ViewModels/
     └── Services/                  # ApiClient, SettingsService
 ```

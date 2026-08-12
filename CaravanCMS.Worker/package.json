@@ -23,12 +23,12 @@
     "better-sqlite3": "^13.0.3",
     "tsx": "^4.23.12",
     "typescript": "^5.7.2",
-    "wrangler": "^4.20.0"
+    "wrangler": "^4.122.0"
   },
   "allowScripts": {
     "sharp@0.33.5": true,
     "esbuild@0.28.1": true,
-    "workerd@1.20260804.1": true,
-    "better-sqlite3@13.0.3": true
+    "better-sqlite3@13.0.3": true,
+    "workerd@1.20260811.1": true
   }
 }
