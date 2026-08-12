@@ -25,6 +25,9 @@ public partial class CaravanViewModel : ObservableObject
     [ObservableProperty] private string _newType = "Call";
     [ObservableProperty] private string _newDirection = "Outbound";
     [ObservableProperty] private string _newBody = string.Empty;
+    [ObservableProperty] private string _newMessageType = "Call";
+    [ObservableProperty] private string _newMessageDirection = "Outbound";
+    [ObservableProperty] private string _newMessageBody = string.Empty;
     [ObservableProperty] private bool _isSavingVehicleInfo;
     [ObservableProperty] private string? _vehicleInfoStatus;
 
@@ -218,6 +221,47 @@ public partial class CaravanViewModel : ObservableObject
         catch (Exception ex)
         {
             StatusText = $"Failed to log conversation: {ex.Message}";
+        }
+    }
+
+    /// <summary>Appends a call/note/email to the currently-expanded conversation instead of starting a new
+    /// one — e.g. a supplier reply that belongs with an existing thread. Saves re-typing the subject and
+    /// avoids splitting related messages across duplicate conversation records.</summary>
+    [RelayCommand]
+    private async Task AddMessageToConversationAsync()
+    {
+        if (ExpandedConversation is null) return;
+
+        try
+        {
+            CommunicationLogDto message = await _api.AddMessageAsync(ExpandedConversation.Id, new LogMessageRequest
+            {
+                Type = NewMessageType,
+                Direction = NewMessageDirection,
+                Body = string.IsNullOrWhiteSpace(NewMessageBody) ? null : NewMessageBody.Trim(),
+                OccurredAt = DateTime.UtcNow
+            });
+
+            ConversationDto updated = new()
+            {
+                Id = ExpandedConversation.Id,
+                CustomerId = ExpandedConversation.CustomerId,
+                RegistrationNumber = ExpandedConversation.RegistrationNumber,
+                Subject = ExpandedConversation.Subject,
+                ExternalConversationId = ExpandedConversation.ExternalConversationId,
+                StartedAt = ExpandedConversation.StartedAt,
+                LastActivityAt = message.OccurredAt > ExpandedConversation.LastActivityAt ? message.OccurredAt : ExpandedConversation.LastActivityAt,
+                Tags = ExpandedConversation.Tags,
+                Messages = [.. ExpandedConversation.Messages, message]
+            };
+
+            NewMessageBody = string.Empty;
+            ReplaceConversation(updated);
+            StatusText = "Added to conversation.";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Failed to add message: {ex.Message}";
         }
     }
 

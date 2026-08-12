@@ -9,7 +9,14 @@ namespace CaravanCMS.Client.Services;
 public class ApiClient
 {
     private readonly HttpClient _http;
-    private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
+    // PropertyNamingPolicy = CamelCase so outgoing request bodies match what CaravanCMS.Worker's
+    // Hono routes expect (a plain case-sensitive JSON.parse, not ASP.NET-style case-insensitive
+    // model binding). PropertyNameCaseInsensitive keeps incoming responses tolerant either way.
+    private static readonly JsonSerializerOptions JsonOpts = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
 
     public string BaseUrl { get; }
 

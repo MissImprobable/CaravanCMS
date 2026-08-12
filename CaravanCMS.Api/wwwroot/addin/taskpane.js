@@ -95,13 +95,33 @@ function trimQuotedReplyChain(bodyText) {
   return bodyText.slice(0, cutIndex).trimEnd();
 }
 
+// Staff (Sent Items / replies) mail comes From a caravanland.co.nz address, not the customer's —
+// treating "From" as always-the-customer meant outbound replies either failed customer lookup
+// outright or, worse, got logged as Inbound. isStaffAddress() lets processCurrentItem() tell the
+// two cases apart and pick the right address (From for inbound, the customer recipient for outbound)
+// to match against CaravanCMS.
+const STAFF_EMAIL_DOMAIN = "caravanland.co.nz";
+function isStaffAddress(address) {
+  return new RegExp(`@${STAFF_EMAIL_DOMAIN}$`, "i").test((address || "").trim());
+}
+
 function getCurrentItemInfo() {
   const item = Office.context.mailbox.item;
   const fromAddress = (item.from && item.from.emailAddress) || (item.sender && item.sender.emailAddress) || "";
+  const toAddresses = (item.to || []).map(r => r.emailAddress).filter(Boolean);
+  const direction = isStaffAddress(fromAddress) ? "Outbound" : "Inbound";
+  // For an outbound (staff) message, the customer is a recipient, not the sender — match on the
+  // first To address that isn't also a staff address (handles internal CC'd colleagues).
+  const matchAddress = direction === "Outbound"
+    ? (toAddresses.find(a => !isStaffAddress(a)) || toAddresses[0] || "")
+    : fromAddress;
   return {
     itemId: item.itemId,
     subject: item.subject || "(No subject)",
     fromAddress,
+    toAddresses,
+    direction,
+    matchAddress,
     conversationId: item.conversationId,
     internetMessageId: item.internetMessageId,
     dateTimeCreated: item.dateTimeCreated
@@ -119,6 +139,7 @@ async function processCurrentItem() {
   const confirmRow = document.getElementById("confirmRow");
   undoRow.classList.add("hidden");
   confirmRow.classList.add("hidden");
+  resetManualAttach();
 
   if (!Settings.isConfigured) {
     statusText.textContent = "Not set up yet";
@@ -132,7 +153,7 @@ async function processCurrentItem() {
   const info = getCurrentItemInfo();
   let customer;
   try {
-    customer = await Api.lookupCustomerByEmail(info.fromAddress);
+    customer = await Api.lookupCustomerByEmail(info.matchAddress);
   } catch (err) {
     if (token !== currentItemToken) return;
     statusText.textContent = "Couldn't reach CaravanCMS";
@@ -143,11 +164,11 @@ async function processCurrentItem() {
 
   if (!customer) {
     statusText.textContent = "Unknown sender";
-    statusDetail.innerHTML = `<span class="muted-text">${info.fromAddress || "(no address)"} doesn't match a CaravanCMS customer. Use the search below to attach it manually.</span>`;
+    statusDetail.innerHTML = `<span class="muted-text">${info.matchAddress || "(no address)"} doesn't match a CaravanCMS customer. Use the search below to attach it manually.</span>`;
     return;
   }
 
-  statusText.innerHTML = `Matched: <span class="success-text">${escapeHtml(customer.name)}</span>`;
+  statusText.innerHTML = `${directionBadge(info.direction)} Matched: <span class="success-text">${escapeHtml(customer.name)}</span>`;
   statusDetail.textContent = `${customer.caravanCount} caravan(s) · ${customer.jobCount} job(s) on file`;
 
   if (Settings.autoLog) {
@@ -181,7 +202,7 @@ async function logEmail(customer, info, token) {
     const conversation = await Api.createConversation(customer.id, info.subject, info.conversationId, registrationNumber);
     const message = await Api.addMessage(conversation.id, {
       type: "Email",
-      direction: "Inbound",
+      direction: info.direction,
       fromAddress: info.fromAddress,
       body: bodyText.slice(0, 20000),
       externalMessageId: info.internetMessageId,
@@ -190,7 +211,7 @@ async function logEmail(customer, info, token) {
     });
     if (token !== currentItemToken) return;
 
-    statusText.innerHTML = `Logged to CaravanCMS ✓ — <span class="success-text">${escapeHtml(customer.name)}</span>`;
+    statusText.innerHTML = `${directionBadge(info.direction)} Logged to CaravanCMS ✓ — <span class="success-text">${escapeHtml(customer.name)}</span>`;
     statusDetail.textContent = registrationNumber
       ? `Linked to caravan ${registrationNumber}${conversation.subject ? " — " + conversation.subject : ""}`
       : (conversation.subject || "");
@@ -215,12 +236,28 @@ async function logEmail(customer, info, token) {
 
 // ── Manual attach (search) ──
 let searchDebounce;
+let resetManualAttach = () => {};
 function initSearch() {
   const box = document.getElementById("searchBox");
   const results = document.getElementById("searchResults");
   const selected = document.getElementById("selectedCaravan");
   const attachButton = document.getElementById("attachButton");
   let chosenCaravan = null;
+
+  // Every piece of manual-attach state (search text, results, the chosen caravan and its
+  // "Attached to X" label) belongs to the email that was open when it was set. None of it
+  // is valid for a different email, so ItemChanged must wipe all of it — otherwise the last
+  // caravan you attached stays displayed as if it applied to whatever you open next, which
+  // is misleading even though no request is actually sent until Attach is clicked again.
+  resetManualAttach = () => {
+    clearTimeout(searchDebounce);
+    chosenCaravan = null;
+    box.value = "";
+    results.innerHTML = "";
+    selected.classList.add("hidden");
+    selected.innerHTML = "";
+    attachButton.classList.add("hidden");
+  };
 
   box.addEventListener("input", () => {
     clearTimeout(searchDebounce);
@@ -266,7 +303,7 @@ function initSearch() {
         chosenCaravan.customerId, info.subject, info.conversationId, chosenCaravan.registrationNumber);
       await Api.addMessage(conversation.id, {
         type: "Email",
-        direction: "Inbound",
+        direction: info.direction,
         fromAddress: info.fromAddress,
         body: bodyText.slice(0, 20000),
         externalMessageId: info.internetMessageId,
@@ -318,6 +355,11 @@ function initSettingsPanel() {
   if (!Settings.isConfigured) {
     document.getElementById("settingsToggle").click();
   }
+}
+
+function directionBadge(direction) {
+  const cls = direction === "Outbound" ? "badge-outbound" : "badge-inbound";
+  return `<span class="direction-badge ${cls}">${direction}</span>`;
 }
 
 function escapeHtml(s) {

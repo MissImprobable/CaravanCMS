@@ -543,7 +543,20 @@
                                                                     BorderThickness="0,1,0,0" Padding="0,8,0,0" Margin="0,4,0,0">
                                                                 <StackPanel>
                                                                     <TextBlock Style="{StaticResource SubText}">
-                                                                        <Run Text="{Binding Direction}" FontWeight="SemiBold"/>
+                                                                        <Run Text="{Binding Direction}" FontWeight="SemiBold">
+                                                                            <Run.Style>
+                                                                                <Style TargetType="Run">
+                                                                                    <Style.Triggers>
+                                                                                        <DataTrigger Binding="{Binding Direction}" Value="Outbound">
+                                                                                            <Setter Property="Foreground" Value="{StaticResource DeepPink}"/>
+                                                                                        </DataTrigger>
+                                                                                        <DataTrigger Binding="{Binding Direction}" Value="Inbound">
+                                                                                            <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                                                                        </DataTrigger>
+                                                                                    </Style.Triggers>
+                                                                                </Style>
+                                                                            </Run.Style>
+                                                                        </Run>
                                                                         <Run Text=" · "/>
                                                                         <Run Text="{Binding FromAddress}"/>
                                                                         <Run Text=" · "/>
@@ -556,6 +569,44 @@
                                                         </DataTemplate>
                                                     </ItemsControl.ItemTemplate>
                                                 </ItemsControl>
+
+                                                <!-- Add message to this conversation (only for the currently-expanded conversation) —
+                                                     for a reply or supplier email that belongs with an existing thread rather than
+                                                     starting a new one. -->
+                                                <StackPanel Margin="0,10,0,0">
+                                                    <StackPanel.Visibility>
+                                                        <MultiBinding Converter="{StaticResource EqualityToVis}" Mode="OneWay">
+                                                            <Binding Path="."/>
+                                                            <Binding Path="DataContext.ExpandedConversation"
+                                                                     RelativeSource="{RelativeSource AncestorType=Window}"/>
+                                                        </MultiBinding>
+                                                    </StackPanel.Visibility>
+                                                    <Grid Margin="0,0,0,6">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="110"/>
+                                                            <ColumnDefinition Width="110"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBox FontSize="12" Padding="6,4" Margin="0,0,6,0"
+                                                                 Text="{Binding DataContext.NewMessageBody,
+                                                                     RelativeSource={RelativeSource AncestorType=Window},
+                                                                     UpdateSourceTrigger=PropertyChanged}"/>
+                                                        <ComboBox Grid.Column="1" FontSize="12" Padding="6,4" Margin="0,0,6,0"
+                                                                  ItemsSource="{Binding DataContext.TypeOptions,
+                                                                      RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                  SelectedItem="{Binding DataContext.NewMessageType,
+                                                                      RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                                        <ComboBox Grid.Column="2" FontSize="12" Padding="6,4"
+                                                                  ItemsSource="{Binding DataContext.DirectionOptions,
+                                                                      RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                  SelectedItem="{Binding DataContext.NewMessageDirection,
+                                                                      RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                                    </Grid>
+                                                    <Button Content="Add to this conversation" FontSize="12" HorizontalAlignment="Left"
+                                                            Style="{StaticResource SecondaryButton}"
+                                                            Command="{Binding DataContext.AddMessageToConversationCommand,
+                                                                RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                                </StackPanel>
 
                                                 <!-- Add label (only for the currently-expanded conversation) -->
                                                 <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
