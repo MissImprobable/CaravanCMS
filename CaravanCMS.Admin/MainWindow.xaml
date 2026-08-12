@@ -37,10 +37,6 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Style="{StaticResource SecondaryButton}"
-                            Content="{Binding ApiProcessLabel}"
-                            Command="{Binding ToggleApiCommand}"
-                            Margin="0,0,8,0" Foreground="White" BorderBrush="#FFFFFF80" MinWidth="90"/>
                     <Button Style="{StaticResource SecondaryButton}" Content="⟳  Refresh"
                             Command="{Binding RefreshStatsCommand}" Margin="0,0,8,0"
                             Foreground="White" BorderBrush="#FFFFFF80"/>
@@ -112,26 +108,24 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Scan documents card -->
+                <!-- Document sync card -->
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                             <TextBlock Text="🗂" FontSize="22" Margin="0,0,12,0" VerticalAlignment="Center"/>
                             <StackPanel>
-                                <TextBlock Text="Scan &amp; Link Documents" Style="{StaticResource HeadingMedium}"/>
-                                <TextBlock Text="Scan the Caravan History folder and link PDFs and images to caravan records."
-                                           Style="{StaticResource SubText}"/>
+                                <TextBlock Text="Document Sync" Style="{StaticResource HeadingMedium}"/>
+                                <TextBlock Text="New files in the Caravan History folder are uploaded and linked automatically while this app is open."
+                                           Style="{StaticResource SubText}" TextWrapping="Wrap"/>
                             </StackPanel>
                         </StackPanel>
                         <Separator Background="{StaticResource BorderPink}" Height="1" Margin="0,0,0,12"/>
                         <StackPanel Orientation="Horizontal">
                             <Button Style="{StaticResource PrimaryButton}"
-                                    Content="Scan Caravan History Folder"
-                                    Click="ScanFiles_Click" MinWidth="200" Margin="0,0,16,0"/>
-                            <TextBlock Style="{StaticResource SubText}" VerticalAlignment="Center">
-                                <Run Text="{Binding TotalDocuments}"/>
-                                <Run Text=" documents currently linked"/>
-                            </TextBlock>
+                                    Content="{Binding ReviewButtonLabel}"
+                                    Click="ReviewDocuments_Click" MinWidth="200" Margin="0,0,16,0"/>
+                            <TextBlock Text="{Binding SyncStatusText}" Style="{StaticResource SubText}"
+                                       VerticalAlignment="Center" TextWrapping="Wrap"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>

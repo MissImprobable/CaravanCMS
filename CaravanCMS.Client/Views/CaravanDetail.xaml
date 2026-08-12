@@ -72,47 +72,137 @@
             <!-- Info tab -->
             <TabItem Header="  Vehicle Info  " Style="{StaticResource PinkTabItem}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,12,0,0">
-                    <Border Style="{StaticResource Card}">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
 
-                            <!-- Vehicle details -->
+                                <!-- Vehicle details (editable) -->
+                                <StackPanel>
+                                    <TextBlock Text="Vehicle Details" Style="{StaticResource HeadingMedium}" Margin="0,0,0,12"/>
+                                    <StackPanel>
+                                        <TextBlock Text="Registration" Style="{StaticResource SubText}" Margin="0,0,0,2"/>
+                                        <TextBlock Text="{Binding Caravan.RegistrationNumber}"
+                                                   FontFamily="Segoe UI" FontSize="28" FontWeight="Bold"
+                                                   Foreground="{StaticResource TextPrimary}" Margin="0,0,0,16"/>
+
+                                        <TextBlock Text="Make" Style="{StaticResource SubText}" Margin="0,0,0,2"/>
+                                        <TextBox Text="{Binding Caravan.Make, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{StaticResource InputBox}" Margin="0,0,0,10"/>
+
+                                        <TextBlock Text="Model" Style="{StaticResource SubText}" Margin="0,0,0,2"/>
+                                        <TextBox Text="{Binding Caravan.Model, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{StaticResource InputBox}" Margin="0,0,0,10"/>
+
+                                        <TextBlock Text="Year" Style="{StaticResource SubText}" Margin="0,0,0,2"/>
+                                        <TextBox Text="{Binding Caravan.Year, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{StaticResource InputBox}" Margin="0,0,0,10"/>
+
+                                        <TextBlock Text="VIN / Chassis" Style="{StaticResource SubText}" Margin="0,0,0,2"/>
+                                        <TextBox Text="{Binding Caravan.Vin, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{StaticResource InputBox}"/>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <!-- Owner details -->
+                                <StackPanel Grid.Column="1" Margin="24,0,0,0">
+                                    <TextBlock Text="Owner Details" Style="{StaticResource HeadingMedium}" Margin="0,0,0,12"/>
+                                    <StackPanel>
+                                        <local:InfoRow Label="Name" Value="{Binding Caravan.Customer.Name}"/>
+                                        <local:InfoRow Label="Email" Value="{Binding Caravan.Customer.Email}"/>
+                                        <local:InfoRow Label="Phone" Value="{Binding Caravan.Customer.Phone}"/>
+                                        <local:InfoRow Label="Mobile" Value="{Binding Caravan.Customer.Mobile}"/>
+                                        <local:InfoRow Label="Address" Value="{Binding Caravan.Customer.Address}"/>
+                                        <local:InfoRow Label="Suburb" Value="{Binding Caravan.Customer.Suburb}"/>
+                                        <local:InfoRow Label="State" Value="{Binding Caravan.Customer.State}"/>
+                                        <local:InfoRow Label="Postcode" Value="{Binding Caravan.Customer.Postcode}"/>
+                                        <local:InfoRow Label="Customer #" Value="{Binding Caravan.Customer.CustomerNumber}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- Certifications & keys (editable) -->
+                        <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel>
+                                    <TextBlock Text="Warrant of Fitness" Style="{StaticResource HeadingMedium}" Margin="0,0,0,12"/>
+                                    <TextBlock Text="Issue Date" Style="{StaticResource SubText}" Margin="0,0,0,2"/>
+                                    <DatePicker SelectedDate="{Binding Caravan.WofIssueDate}" Margin="0,0,0,10" HorizontalAlignment="Stretch"/>
+                                    <TextBlock Text="Due Date" Style="{StaticResource SubText}" Margin="0,0,0,2"/>
+                                    <DatePicker SelectedDate="{Binding Caravan.WofDueDate}" HorizontalAlignment="Stretch"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Margin="24,0,0,0">
+                                    <TextBlock Text="Warrant of Electrical Fitness" Style="{StaticResource HeadingMedium}" Margin="0,0,0,12"/>
+                                    <TextBlock Text="Issue Date" Style="{StaticResource SubText}" Margin="0,0,0,2"/>
+                                    <DatePicker SelectedDate="{Binding Caravan.ElectricalWofIssueDate}" Margin="0,0,0,10" HorizontalAlignment="Stretch"/>
+                                    <TextBlock Text="Due Date" Style="{StaticResource SubText}" Margin="0,0,0,2"/>
+                                    <DatePicker SelectedDate="{Binding Caravan.ElectricalWofDueDate}" HorizontalAlignment="Stretch"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2" Margin="24,0,0,0">
+                                    <TextBlock Text="Self Containment" Style="{StaticResource HeadingMedium}" Margin="0,0,0,12"/>
+                                    <TextBlock Text="Issue Date" Style="{StaticResource SubText}" Margin="0,0,0,2"/>
+                                    <DatePicker SelectedDate="{Binding Caravan.SelfContainmentIssueDate}" Margin="0,0,0,10" HorizontalAlignment="Stretch"/>
+                                    <TextBlock Text="Due Date" Style="{StaticResource SubText}" Margin="0,0,0,2"/>
+                                    <DatePicker SelectedDate="{Binding Caravan.SelfContainmentDue}" HorizontalAlignment="Stretch"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- Keys -->
+                        <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel>
+                                    <TextBlock Text="Locker Key Number" Style="{StaticResource SubText}" Margin="0,0,0,2"/>
+                                    <TextBox Text="{Binding Caravan.LockerKeyNumber, UpdateSourceTrigger=PropertyChanged}"
+                                             Style="{StaticResource InputBox}"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Margin="24,0,0,0">
+                                    <TextBlock Text="Door Key Number" Style="{StaticResource SubText}" Margin="0,0,0,2"/>
+                                    <TextBox Text="{Binding Caravan.DoorKeyNumber, UpdateSourceTrigger=PropertyChanged}"
+                                             Style="{StaticResource InputBox}"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- Notes -->
+                        <Border Style="{StaticResource Card}" Margin="0,16,0,0">
                             <StackPanel>
-                                <TextBlock Text="Vehicle Details" Style="{StaticResource HeadingMedium}" Margin="0,0,0,12"/>
-                                <StackPanel>
-                                    <local:InfoRow Label="Make" Value="{Binding Caravan.Make}"/>
-                                    <local:InfoRow Label="Model" Value="{Binding Caravan.Model}"/>
-                                    <local:InfoRow Label="Year" Value="{Binding Caravan.Year}"/>
-                                    <local:InfoRow Label="Body Type" Value="{Binding Caravan.Body}"/>
-                                    <local:InfoRow Label="VIN / Chassis" Value="{Binding Caravan.Vin}"/>
-                                    <local:InfoRow Label="Registration" Value="{Binding Caravan.RegistrationNumber}"/>
-                                    <local:InfoRow Label="Odometer"
-                                                   Value="{Binding Caravan.CurrentOdometer, StringFormat='{}{0:N0} km'}"/>
-                                    <local:InfoRow Label="Last Serviced"
-                                                   Value="{Binding Caravan.LastJobDate, StringFormat='dd MMM yyyy'}"/>
-                                </StackPanel>
+                                <TextBlock Text="Notes" Style="{StaticResource HeadingMedium}" Margin="0,0,0,12"/>
+                                <TextBox Text="{Binding Caravan.Notes, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource InputBox}"
+                                         AcceptsReturn="True" TextWrapping="Wrap"
+                                         VerticalScrollBarVisibility="Auto"
+                                         Height="140" VerticalContentAlignment="Top"/>
                             </StackPanel>
+                        </Border>
 
-                            <!-- Owner details -->
-                            <StackPanel Grid.Column="1" Margin="24,0,0,0">
-                                <TextBlock Text="Owner Details" Style="{StaticResource HeadingMedium}" Margin="0,0,0,12"/>
-                                <StackPanel>
-                                    <local:InfoRow Label="Name" Value="{Binding Caravan.Customer.Name}"/>
-                                    <local:InfoRow Label="Email" Value="{Binding Caravan.Customer.Email}"/>
-                                    <local:InfoRow Label="Phone" Value="{Binding Caravan.Customer.Phone}"/>
-                                    <local:InfoRow Label="Mobile" Value="{Binding Caravan.Customer.Mobile}"/>
-                                    <local:InfoRow Label="Address" Value="{Binding Caravan.Customer.Address}"/>
-                                    <local:InfoRow Label="Suburb" Value="{Binding Caravan.Customer.Suburb}"/>
-                                    <local:InfoRow Label="State" Value="{Binding Caravan.Customer.State}"/>
-                                    <local:InfoRow Label="Postcode" Value="{Binding Caravan.Customer.Postcode}"/>
-                                    <local:InfoRow Label="Customer #" Value="{Binding Caravan.Customer.CustomerNumber}"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </Grid>
-                    </Border>
+                        <!-- Save -->
+                        <StackPanel Orientation="Horizontal" Margin="0,16,0,0" VerticalAlignment="Center">
+                            <Button Content="Save Vehicle Info" Style="{StaticResource PrimaryButton}"
+                                    Command="{Binding SaveVehicleInfoCommand}"
+                                    Padding="20,8"/>
+                            <TextBlock Text="{Binding VehicleInfoStatus}" Style="{StaticResource SubText}"
+                                       Margin="16,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </StackPanel>
                 </ScrollViewer>
             </TabItem>
 
@@ -183,52 +273,33 @@
                                                     <DataTemplate>
                                                         <Border BorderBrush="{StaticResource BorderPink}"
                                                                 BorderThickness="0,1,0,0" Padding="0,8,0,0" Margin="0,4,0,0">
-                                                            <Grid>
-                                                                <Grid.ColumnDefinitions>
-                                                                    <ColumnDefinition Width="*"/>
-                                                                    <ColumnDefinition Width="Auto"/>
-                                                                </Grid.ColumnDefinitions>
-                                                                <StackPanel>
-                                                                    <TextBlock Style="{StaticResource BodyText}">
-                                                                        <Run Text="Invoice #" FontWeight="SemiBold"/>
-                                                                        <Run Text="{Binding InvoiceNumber}" FontWeight="SemiBold"/>
-                                                                        <Run Text="  "/>
-                                                                        <Run Text="{Binding IssueDate, StringFormat='dd MMM yyyy'}"
-                                                                             Foreground="{StaticResource TextSecondary}"/>
-                                                                    </TextBlock>
-                                                                    <!-- Line items -->
-                                                                    <ItemsControl ItemsSource="{Binding Items}" Margin="0,6,0,0">
-                                                                        <ItemsControl.ItemTemplate>
-                                                                            <DataTemplate>
-                                                                                <Grid Margin="0,2">
-                                                                                    <Grid.ColumnDefinitions>
-                                                                                        <ColumnDefinition Width="*"/>
-                                                                                        <ColumnDefinition Width="50"/>
-                                                                                        <ColumnDefinition Width="80"/>
-                                                                                    </Grid.ColumnDefinitions>
-                                                                                    <TextBlock Text="{Binding Description}"
-                                                                                               Style="{StaticResource SubText}"/>
-                                                                                    <TextBlock Grid.Column="1" Style="{StaticResource SubText}"
-                                                                                               Text="{Binding Quantity}"
-                                                                                               HorizontalAlignment="Center"/>
-                                                                                    <TextBlock Grid.Column="2" Style="{StaticResource SubText}"
-                                                                                               Text="{Binding NetAmount, StringFormat='${0:N2}'}"
-                                                                                               HorizontalAlignment="Right"/>
-                                                                                </Grid>
-                                                                            </DataTemplate>
-                                                                        </ItemsControl.ItemTemplate>
-                                                                    </ItemsControl>
-                                                                </StackPanel>
-                                                                <StackPanel Grid.Column="1" HorizontalAlignment="Right" Margin="16,0,0,0">
-                                                                    <TextBlock Text="{Binding TotalAmount, StringFormat='${0:N2}'}"
-                                                                               FontSize="18" FontWeight="Bold"
-                                                                               Foreground="{StaticResource DeepPink}"
-                                                                               HorizontalAlignment="Right"/>
-                                                                    <TextBlock Text="{Binding Status}"
-                                                                               Style="{StaticResource SubText}"
-                                                                               HorizontalAlignment="Right"/>
-                                                                </StackPanel>
-                                                            </Grid>
+                                                            <StackPanel>
+                                                                <TextBlock Style="{StaticResource BodyText}">
+                                                                    <Run Text="Invoice #" FontWeight="SemiBold"/>
+                                                                    <Run Text="{Binding InvoiceNumber}" FontWeight="SemiBold"/>
+                                                                    <Run Text="  "/>
+                                                                    <Run Text="{Binding IssueDate, StringFormat='dd MMM yyyy'}"
+                                                                         Foreground="{StaticResource TextSecondary}"/>
+                                                                </TextBlock>
+                                                                <!-- Line items -->
+                                                                <ItemsControl ItemsSource="{Binding Items}" Margin="0,6,0,0">
+                                                                    <ItemsControl.ItemTemplate>
+                                                                        <DataTemplate>
+                                                                            <Grid Margin="0,2">
+                                                                                <Grid.ColumnDefinitions>
+                                                                                    <ColumnDefinition Width="*"/>
+                                                                                    <ColumnDefinition Width="50"/>
+                                                                                </Grid.ColumnDefinitions>
+                                                                                <TextBlock Text="{Binding Description}"
+                                                                                           Style="{StaticResource SubText}"/>
+                                                                                <TextBlock Grid.Column="1" Style="{StaticResource SubText}"
+                                                                                           Text="{Binding Quantity}"
+                                                                                           HorizontalAlignment="Center"/>
+                                                                            </Grid>
+                                                                        </DataTemplate>
+                                                                    </ItemsControl.ItemTemplate>
+                                                                </ItemsControl>
+                                                            </StackPanel>
                                                         </Border>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>

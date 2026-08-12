@@ -9,6 +9,7 @@ namespace CaravanCMS.Admin;
 public partial class MainWindow : Window
 {
     private readonly MainViewModel _vm;
+    private bool _balloonShown;
 
     public MainWindow()
     {
@@ -20,13 +21,35 @@ public partial class MainWindow : Window
 
         Loaded += async (_, _) =>
         {
-            if (App.ApiHost is { IsRunning: true })
-            {
-                _vm.StatusMessage = "Waiting for API to be ready...";
-                await App.ApiHost.WaitUntilReadyAsync(TimeSpan.FromSeconds(15));
-            }
             await _vm.RefreshStatsCommand.ExecuteAsync(null);
         };
+
+        // Minimizing hides to tray instead of showing a taskbar-minimized window — the document
+        // sync service keeps running either way, this is just about not cluttering the taskbar.
+        StateChanged += (_, _) =>
+        {
+            if (WindowState == WindowState.Minimized) MinimizeToTray();
+        };
+
+        // Closing the window (the X button) also just goes to tray — sync only runs while the
+        // process is alive, so a real quit is reserved for the tray icon's explicit "Exit".
+        Closing += (_, e) =>
+        {
+            e.Cancel = true;
+            MinimizeToTray();
+        };
+    }
+
+    private void MinimizeToTray()
+    {
+        Hide();
+        ShowInTaskbar = false;
+
+        if (!_balloonShown)
+        {
+            App.TrayIcon?.ShowBalloon("CaravanCMS Admin", "Still running and watching for new documents. Right-click the tray icon to exit.");
+            _balloonShown = true;
+        }
     }
 
     private void Settings_Click(object sender, RoutedEventArgs e)
@@ -55,7 +78,7 @@ public partial class MainWindow : Window
         _ = _vm.RefreshStatsCommand.ExecuteAsync(null);
     }
 
-    private void ScanFiles_Click(object sender, RoutedEventArgs e)
+    private void ReviewDocuments_Click(object sender, RoutedEventArgs e)
     {
         if (_vm.ApiClientInstance is null)
         {
@@ -64,7 +87,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        ScanFilesDialog dialog = new(_vm.ApiClientInstance);
+        DocumentReviewDialog dialog = new(_vm.ApiClientInstance, App.ReviewStore, _vm.Settings.CaravanHistoryPath);
         dialog.Owner = this;
         dialog.ShowDialog();
         _ = _vm.RefreshStatsCommand.ExecuteAsync(null);

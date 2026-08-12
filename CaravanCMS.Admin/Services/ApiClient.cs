@@ -29,6 +29,28 @@ public class ApiClient
         _http.DefaultRequestHeaders.Add("X-API-Key", apiKey);
     }
 
+    /// <summary>
+    /// .NET's MultipartFormDataContent.Add(content, name) doesn't always quote the Content-Disposition
+    /// name/filename parameters (it treats quoting as optional for token-safe values per RFC 6266,
+    /// which is spec-legal but broke against the Worker's stricter incoming multipart parser — every
+    /// upload failed with "Content-Disposition header in FormData part is missing a name" until this
+    /// was fixed). Setting the header manually guarantees quoted values every time.
+    /// </summary>
+    private static void SetFormDataName(HttpContent content, string name, string? fileName = null)
+    {
+        content.Headers.Remove("Content-Disposition");
+        string header = $"form-data; name=\"{name}\"";
+        if (fileName is not null) header += $"; filename=\"{fileName}\"";
+        content.Headers.TryAddWithoutValidation("Content-Disposition", header);
+    }
+
+    private static void AddFormField(MultipartFormDataContent content, string name, string value)
+    {
+        StringContent part = new(value);
+        SetFormDataName(part, name);
+        content.Add(part);
+    }
+
     /// <summary>Tests the connection by fetching the stats endpoint. Returns true on success.</summary>
     public async Task<(bool Success, string Message)> TestConnectionAsync()
     {
@@ -67,7 +89,8 @@ public class ApiClient
             : "application/vnd.ms-excel";
 
         fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
-        content.Add(fileContent, "file", Path.GetFileName(filePath));
+        SetFormDataName(fileContent, "file", Path.GetFileName(filePath));
+        content.Add(fileContent);
 
         progress?.Report("Uploading to server...");
         HttpResponseMessage response = await _http.PostAsync("api/import/mechanicdesk", content);
@@ -83,33 +106,70 @@ public class ApiClient
         return result ?? new ImportResultDto { Errors = { "Server returned empty response." } };
     }
 
-    /// <summary>Triggers a file scan on the server's configured Caravan History folder.</summary>
-    public async Task<FileScanResultDto> ScanFilesAsync(string? folderPath = null, IProgress<string>? progress = null)
+    /// <summary>
+    /// Returns every Document row (no filters) — used by the document sync service to know
+    /// which local FilePaths are already linked, so it doesn't re-upload them.
+    /// </summary>
+    public async Task<List<DocumentDto>> GetAllDocumentsAsync()
     {
-        progress?.Report("Starting file scan...");
-
-        ScanFilesRequest request = new() { FolderPath = folderPath };
-        HttpResponseMessage response = await _http.PostAsJsonAsync("api/import/scan-files", request, JsonOpts);
-
-        if (!response.IsSuccessStatusCode)
-        {
-            string errorBody = await response.Content.ReadAsStringAsync();
-            throw new ApiException($"Scan failed ({(int)response.StatusCode}): {errorBody}");
-        }
-
-        FileScanResultDto? result = await response.Content.ReadFromJsonAsync<FileScanResultDto>(JsonOpts);
-        return result ?? new FileScanResultDto();
+        HttpResponseMessage response = await _http.GetAsync("api/documents");
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<List<DocumentDto>>(JsonOpts) ?? new();
     }
 
-    /// <summary>Links a file to a caravan as a document record.</summary>
-    public async Task<DocumentDto> LinkDocumentAsync(LinkDocumentRequest request)
+    /// <summary>
+    /// Uploads a local file's bytes directly to the server (which resizes images and stores them
+    /// in R2) and creates the linking Document row in one call. This replaces the old model of
+    /// "point the server at a file path already on its own disk" — Workers has no local filesystem
+    /// to read from, so the actual bytes must be sent.
+    /// </summary>
+    public async Task<DocumentDto> UploadDocumentAsync(string filePath, string registrationNumber, string documentType, string linkMethod, string? sourceFilePath = null)
     {
-        HttpResponseMessage response = await _http.PostAsJsonAsync("api/import/link-document", request, JsonOpts);
+        using MultipartFormDataContent content = new();
+        HttpContent fileContent;
+        bool alreadyResized = false;
 
+        // Resize here rather than relying on the Worker's own resize step — @cf-wasm/photon has
+        // an unresolved WASM bug there (see ImageResizeService's doc comment), and doing it
+        // client-side with System.Drawing avoids that entirely for this, the dominant upload path.
+        // Also tells the Worker to skip its own resize (alreadyResized=true below) — that step is
+        // CPU-heavy enough to occasionally trip the free tier's 10ms-per-request limit (Cloudflare
+        // error 1102), which is the most likely actual trigger for the WASM corruption bug.
+        if (ImageResizeService.IsResizable(filePath))
+        {
+            (byte[] bytes, string fileName) = ImageResizeService.Resize(filePath);
+            fileContent = new ByteArrayContent(bytes);
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg");
+            SetFormDataName(fileContent, "file", fileName);
+            alreadyResized = true;
+        }
+        else
+        {
+            FileStream fileStream = File.OpenRead(filePath);
+            fileContent = new StreamContent(fileStream);
+            SetFormDataName(fileContent, "file", Path.GetFileName(filePath));
+        }
+
+        using (fileContent)
+        {
+            content.Add(fileContent);
+            AddFormField(content, "registrationNumber", registrationNumber);
+            AddFormField(content, "documentType", documentType);
+            AddFormField(content, "linkMethod", linkMethod);
+            if (alreadyResized) AddFormField(content, "alreadyResized", "true");
+            if (sourceFilePath is not null) AddFormField(content, "filePath", sourceFilePath);
+
+            HttpResponseMessage response = await _http.PostAsync("api/documents", content);
+            return await HandleUploadResponseAsync(response);
+        }
+    }
+
+    private async Task<DocumentDto> HandleUploadResponseAsync(HttpResponseMessage response)
+    {
         if (!response.IsSuccessStatusCode)
         {
             string error = await response.Content.ReadAsStringAsync();
-            throw new ApiException($"Link failed ({(int)response.StatusCode}): {error}");
+            throw new ApiException($"Upload failed ({(int)response.StatusCode}): {error}");
         }
 
         DocumentDto? doc = await response.Content.ReadFromJsonAsync<DocumentDto>(JsonOpts);
@@ -123,6 +183,24 @@ public class ApiClient
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<InferredLinksReportDto>(JsonOpts)
                ?? new InferredLinksReportDto();
+    }
+
+    /// <summary>
+    /// Creates a minimal placeholder caravan for a registration number found on disk with no
+    /// matching database row (attached to a shared "Unassigned" customer server-side). Returns
+    /// null on 409 (already exists — a race with another sync run) rather than throwing, since
+    /// that's an expected, harmless outcome for the caller to just re-fetch and continue past.
+    /// </summary>
+    public async Task<CaravanSummaryDto?> CreatePlaceholderCaravanAsync(string registrationNumber, string? vin)
+    {
+        HttpResponseMessage response = await _http.PostAsJsonAsync("api/caravans",
+            new { registrationNumber, vin }, JsonOpts);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict) return null;
+        if (!response.IsSuccessStatusCode)
+            throw new ApiException($"Create caravan failed ({(int)response.StatusCode}): {await response.Content.ReadAsStringAsync()}");
+
+        return await response.Content.ReadFromJsonAsync<CaravanSummaryDto>(JsonOpts);
     }
 
     /// <summary>Returns all caravans (lightweight summary list).</summary>

@@ -18,22 +18,7 @@ public partial class SettingsWindow : Window
         _settings = settingsService.Load();
         DataContext = _settings;
         PwdApiKey.Password = _settings.ApiKey;
-    }
-
-    private void BrowseExe_Click(object sender, RoutedEventArgs e)
-    {
-        OpenFileDialog dialog = new()
-        {
-            Title = "Locate CaravanCMS.Api.exe",
-            Filter = "CaravanCMS API (CaravanCMS.Api.exe)|CaravanCMS.Api.exe|Executables (*.exe)|*.exe",
-            FileName = "CaravanCMS.Api.exe"
-        };
-
-        if (dialog.ShowDialog() == true)
-        {
-            _settings.ApiExePath = dialog.FileName;
-            TxtApiExePath.Text = dialog.FileName;
-        }
+        ChkStartWithWindows.IsChecked = StartupRegistrationService.IsEnabled();
     }
 
     private void BrowseFolder_Click(object sender, RoutedEventArgs e)
@@ -82,7 +67,8 @@ public partial class SettingsWindow : Window
         _settings.ApiKey = PwdApiKey.Password.Trim();
         _settings.CaravanHistoryPath = TxtFolderPath.Text.Trim();
         _settingsService.Save(_settings);
-        App.RefreshApiHostSettings(_settings);
+        StartupRegistrationService.SetEnabled(ChkStartWithWindows.IsChecked == true);
+        App.RestartDocumentSync(_settings);
         DialogResult = true;
         Close();
     }

@@ -62,6 +62,16 @@ public class ApiClient
         return await r.Content.ReadFromJsonAsync<CaravanDetailDto>(JsonOpts);
     }
 
+    /// <summary>Saves edits made on the Vehicle Info tab. Returns the updated caravan record.</summary>
+    public async Task<CaravanDetailDto> UpdateCaravanAsync(string rego, UpdateCaravanRequest request)
+    {
+        HttpResponseMessage r = await _http.PatchAsync($"api/caravans/{Uri.EscapeDataString(rego)}",
+            JsonContent.Create(request, options: JsonOpts));
+        r.EnsureSuccessStatusCode();
+        return await r.Content.ReadFromJsonAsync<CaravanDetailDto>(JsonOpts)
+               ?? throw new InvalidOperationException("Server returned empty caravan response.");
+    }
+
     public async Task<ApiStatsDto?> GetStatsAsync()
     {
         HttpResponseMessage r = await _http.GetAsync("api/caravans/stats");

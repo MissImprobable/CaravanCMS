@@ -42,24 +42,6 @@
                 </StackPanel>
 
                 <StackPanel Margin="0,0,0,14">
-                    <TextBlock Text="API Executable Path" Style="{StaticResource BodyText}"
-                               FontWeight="SemiBold" Margin="0,0,0,5"/>
-                    <TextBlock Text="Only needed for the Start/Stop API button above — points at CaravanCMS.Api.exe."
-                               Style="{StaticResource SubText}" Margin="0,0,0,5" TextWrapping="Wrap"/>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBox x:Name="TxtApiExePath" Style="{StaticResource InputBox}"
-                                 Text="{Binding ApiExePath, UpdateSourceTrigger=PropertyChanged}"
-                                 Margin="0,0,8,0"/>
-                        <Button Grid.Column="1" Style="{StaticResource SecondaryButton}"
-                                Content="Browse" Click="BrowseExe_Click"/>
-                    </Grid>
-                </StackPanel>
-
-                <StackPanel Margin="0,0,0,14">
                     <TextBlock Text="Caravan History Folder" Style="{StaticResource BodyText}"
                                FontWeight="SemiBold" Margin="0,0,0,5"/>
                     <Grid>
@@ -73,6 +55,13 @@
                         <Button Grid.Column="1" Style="{StaticResource SecondaryButton}"
                                 Content="Browse" Click="BrowseFolder_Click"/>
                     </Grid>
+                </StackPanel>
+
+                <StackPanel Margin="0,0,0,14">
+                    <CheckBox x:Name="ChkStartWithWindows" Content="Start with Windows"
+                              FontFamily="Segoe UI" FontSize="13"/>
+                    <TextBlock Text="Runs minimized to the system tray at sign-in, so document sync is always watching."
+                               Style="{StaticResource SubText}" Margin="24,4,0,0" TextWrapping="Wrap"/>
                 </StackPanel>
 
                 <!-- Connection test result -->

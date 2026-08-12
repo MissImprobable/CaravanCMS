@@ -32,6 +32,6 @@ public class SettingsService
 
 public class ClientSettings
 {
-    public string ApiBaseUrl { get; set; } = "http://localhost:5000";
+    public string ApiBaseUrl { get; set; } = "https://api.caravanland.co.nz";
     public string ApiKey { get; set; } = "caravanland-internal-api-key-2024";
 }

@@ -25,6 +25,8 @@ public partial class CaravanViewModel : ObservableObject
     [ObservableProperty] private string _newType = "Call";
     [ObservableProperty] private string _newDirection = "Outbound";
     [ObservableProperty] private string _newBody = string.Empty;
+    [ObservableProperty] private bool _isSavingVehicleInfo;
+    [ObservableProperty] private string? _vehicleInfoStatus;
 
     public ObservableCollection<JobDetailDto> Jobs { get; } = new();
     public ObservableCollection<DocumentItemViewModel> Documents { get; } = new();
@@ -216,6 +218,53 @@ public partial class CaravanViewModel : ObservableObject
         catch (Exception ex)
         {
             StatusText = $"Failed to log conversation: {ex.Message}";
+        }
+    }
+
+    /// <summary>Persists edits made on the Vehicle Info tab (vehicle fields, WOF/electrical/self-containment dates, keys, notes).</summary>
+    [RelayCommand]
+    private async Task SaveVehicleInfoAsync()
+    {
+        if (Caravan is null) return;
+
+        IsSavingVehicleInfo = true;
+        VehicleInfoStatus = "Saving...";
+        try
+        {
+            CaravanDetailDto updated = await _api.UpdateCaravanAsync(Caravan.RegistrationNumber, new UpdateCaravanRequest
+            {
+                Vin = Caravan.Vin,
+                Make = Caravan.Make,
+                Model = Caravan.Model,
+                Year = Caravan.Year,
+                WofIssueDate = Caravan.WofIssueDate,
+                WofDueDate = Caravan.WofDueDate,
+                ElectricalWofIssueDate = Caravan.ElectricalWofIssueDate,
+                ElectricalWofDueDate = Caravan.ElectricalWofDueDate,
+                SelfContainmentIssueDate = Caravan.SelfContainmentIssueDate,
+                SelfContainmentDue = Caravan.SelfContainmentDue,
+                LockerKeyNumber = Caravan.LockerKeyNumber,
+                DoorKeyNumber = Caravan.DoorKeyNumber,
+                Notes = Caravan.Notes
+            });
+
+            // Preserve the loaded history collections (Jobs/Documents/Conversations) — the PATCH
+            // response only carries the caravan record itself.
+            updated.Jobs = Caravan.Jobs;
+            updated.Documents = Caravan.Documents;
+            updated.Conversations = Caravan.Conversations;
+            updated.Customer = Caravan.Customer;
+            Caravan = updated;
+
+            VehicleInfoStatus = "Saved.";
+        }
+        catch (Exception ex)
+        {
+            VehicleInfoStatus = $"Save failed: {ex.Message}";
+        }
+        finally
+        {
+            IsSavingVehicleInfo = false;
         }
     }
 

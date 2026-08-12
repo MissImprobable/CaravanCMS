@@ -3,10 +3,12 @@ using System.Windows;
 
 namespace CaravanCMS.Admin;
 
-public partial class App : Application
+public partial class App : System.Windows.Application
 {
     public static SettingsService SettingsService { get; } = new();
-    public static ApiHostService? ApiHost { get; private set; }
+    public static PendingReviewStore ReviewStore { get; } = new();
+    public static DocumentSyncService? DocumentSync { get; private set; }
+    public static TrayIconService? TrayIcon { get; private set; }
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -22,30 +24,39 @@ public partial class App : Application
             args.Handled = true;
         };
 
+        TrayIcon = new TrayIconService();
+        TrayIcon.OpenRequested += ShowMainWindow;
+        TrayIcon.ExitRequested += () => Shutdown();
+
         AppSettings settings = SettingsService.Load();
-        string exePath = ApiHostService.ResolveExePath(settings.ApiExePath);
-        ApiHost = new ApiHostService(exePath, settings.ApiBaseUrl);
-        _ = ApiHost.StartAsync();
+        ApiClient syncApi = new(settings.ApiBaseUrl, settings.ApiKey);
+        DocumentSync = new DocumentSyncService(syncApi, ReviewStore, settings.CaravanHistoryPath);
+        _ = DocumentSync.StartAsync();
     }
 
-    /// <summary>
-    /// Rebuilds ApiHost from freshly saved settings, so a path/URL change in Settings takes
-    /// effect on the next Start without requiring a full Admin app restart. Skipped while the
-    /// API is currently running, since swapping the host would orphan the live process handle.
-    /// </summary>
-    public static void RefreshApiHostSettings(AppSettings settings)
+    private void ShowMainWindow()
     {
-        if (ApiHost is { IsRunning: true }) return;
+        Window? window = MainWindow;
+        if (window is null) return;
 
-        ApiHost?.Dispose();
-        string exePath = ApiHostService.ResolveExePath(settings.ApiExePath);
-        ApiHost = new ApiHostService(exePath, settings.ApiBaseUrl);
+        window.Show();
+        window.WindowState = WindowState.Normal;
+        window.Activate();
+    }
+
+    /// <summary>Restarts the document sync service against freshly saved settings (new folder path/API endpoint).</summary>
+    public static void RestartDocumentSync(AppSettings settings)
+    {
+        DocumentSync?.Dispose();
+        ApiClient syncApi = new(settings.ApiBaseUrl, settings.ApiKey);
+        DocumentSync = new DocumentSyncService(syncApi, ReviewStore, settings.CaravanHistoryPath);
+        _ = DocumentSync.StartAsync();
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
-        ApiHost?.Stop();
-        ApiHost?.Dispose();
+        DocumentSync?.Dispose();
+        TrayIcon?.Dispose();
         base.OnExit(e);
     }
 }

@@ -385,6 +385,14 @@ public class CaravanDetailDto
     public DateTime? LastJobDate { get; set; }
     public string? SelfContainment { get; set; }
     public DateTime? SelfContainmentDue { get; set; }
+    public DateTime? SelfContainmentIssueDate { get; set; }
+    public DateTime? WofIssueDate { get; set; }
+    public DateTime? WofDueDate { get; set; }
+    public DateTime? ElectricalWofIssueDate { get; set; }
+    public DateTime? ElectricalWofDueDate { get; set; }
+    public string? LockerKeyNumber { get; set; }
+    public string? DoorKeyNumber { get; set; }
+    public string? Notes { get; set; }
     public string? MechanicDeskId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
@@ -393,6 +401,29 @@ public class CaravanDetailDto
     public List<JobDetailDto> Jobs { get; set; } = new();
     public List<DocumentDto> Documents { get; set; } = new();
     public List<ConversationDto> Conversations { get; set; } = new();
+}
+
+/// <summary>
+/// Request payload for PATCH /api/caravans/{rego} — every property is optional/nullable so
+/// callers only send the fields they're actually changing. RegistrationNumber is intentionally
+/// not included: it's the table's primary key and Jobs/Documents/Invoices all reference it
+/// directly, so renaming it needs a real cascading-update story, not a simple field edit.
+/// </summary>
+public class UpdateCaravanRequest
+{
+    public string? Vin { get; set; }
+    public string? Make { get; set; }
+    public string? Model { get; set; }
+    public int? Year { get; set; }
+    public DateTime? WofIssueDate { get; set; }
+    public DateTime? WofDueDate { get; set; }
+    public DateTime? ElectricalWofIssueDate { get; set; }
+    public DateTime? ElectricalWofDueDate { get; set; }
+    public DateTime? SelfContainmentIssueDate { get; set; }
+    public DateTime? SelfContainmentDue { get; set; }
+    public string? LockerKeyNumber { get; set; }
+    public string? DoorKeyNumber { get; set; }
+    public string? Notes { get; set; }
 }
 
 /// <summary>A conversation thread with a customer, including its messages and purpose tags.</summary>

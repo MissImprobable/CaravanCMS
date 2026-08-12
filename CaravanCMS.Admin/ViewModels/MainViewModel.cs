@@ -23,8 +23,8 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _lastImportTime = "Never";
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string _statusMessage = "Ready";
-    [ObservableProperty] private bool _apiProcessRunning;
-    [ObservableProperty] private string _apiProcessLabel = "Start API";
+    [ObservableProperty] private string _syncStatusText = "Watching for new documents...";
+    [ObservableProperty] private string _reviewButtonLabel = "Review Documents";
 
     public AppSettings Settings { get; private set; }
 
@@ -33,51 +33,20 @@ public partial class MainViewModel : ObservableObject
         _settingsService = settingsService;
         Settings = _settingsService.Load();
         ApiUrl = Settings.ApiBaseUrl;
+
+        App.ReviewStore.Changed += UpdateReviewButtonLabel;
+        UpdateReviewButtonLabel();
+
+        if (App.DocumentSync is not null)
+            App.DocumentSync.StatusChanged += status => SyncStatusText = status;
     }
+
+    private void UpdateReviewButtonLabel() =>
+        ReviewButtonLabel = App.ReviewStore.Count > 0 ? $"Review Documents ({App.ReviewStore.Count})" : "Review Documents";
 
     public void InitializeApi()
     {
         _api = new ApiClient(Settings.ApiBaseUrl, Settings.ApiKey);
-        SyncApiProcessState();
-    }
-
-    private void SyncApiProcessState()
-    {
-        ApiProcessRunning = App.ApiHost?.IsRunning ?? false;
-        ApiProcessLabel = ApiProcessRunning ? "Stop API" : "Start API";
-    }
-
-    [RelayCommand]
-    private async Task ToggleApiAsync()
-    {
-        ApiHostService? host = App.ApiHost;
-        if (host is null) return;
-
-        if (host.IsRunning)
-        {
-            host.Stop();
-            SyncApiProcessState();
-            IsConnected = false;
-            ConnectionStatus = "Disconnected";
-            StatusMessage = "API stopped.";
-        }
-        else
-        {
-            StatusMessage = "Starting API...";
-            bool started = await host.StartAsync();
-            if (!started)
-            {
-                StatusMessage = "Could not find CaravanCMS.Api.exe — check the path in Settings.";
-                return;
-            }
-
-            bool ready = await host.WaitUntilReadyAsync(TimeSpan.FromSeconds(15));
-            SyncApiProcessState();
-            StatusMessage = ready ? "API started." : "API started but is not responding yet.";
-
-            if (ready)
-                await RefreshStatsCommand.ExecuteAsync(null);
-        }
     }
 
     [RelayCommand]
@@ -139,6 +108,11 @@ public partial class MainViewModel : ObservableObject
         Settings = _settingsService.Load();
         ApiUrl = Settings.ApiBaseUrl;
         InitializeApi();
+
+        // Settings save may have swapped App.DocumentSync for a fresh instance (RestartDocumentSync) —
+        // resubscribe so status updates keep flowing to this ViewModel after that happens.
+        if (App.DocumentSync is not null)
+            App.DocumentSync.StatusChanged += status => SyncStatusText = status;
     }
 
     private static string FormatBytes(long bytes) => bytes switch

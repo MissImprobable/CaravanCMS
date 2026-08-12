@@ -42,9 +42,8 @@ public class SettingsService
 /// <summary>User-configurable settings for the Admin application.</summary>
 public class AppSettings
 {
-    public string ApiBaseUrl { get; set; } = "http://localhost:5000";
+    public string ApiBaseUrl { get; set; } = "https://api.caravanland.co.nz";
     public string ApiKey { get; set; } = "caravanland-internal-api-key-2024";
     public string CaravanHistoryPath { get; set; } = @"C:\Users\info\OneDrive - Caravanland\Documents\Caravan History";
-    public string ApiExePath { get; set; } = @"CaravanCMS.Api.exe";
     public DateTime? LastImportAt { get; set; }
 }

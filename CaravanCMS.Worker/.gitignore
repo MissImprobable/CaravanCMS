@@ -1,0 +1,10 @@
+node_modules/
+.wrangler/
+.dev.vars
+.dev.vars.*
+dist/
+*.log
+
+# One-off D1/R2 migration outputs — contain real customer PII, never commit
+scripts/migration-output.sql
+scripts/file-migration-output.sql

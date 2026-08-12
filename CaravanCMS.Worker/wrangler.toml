@@ -1,0 +1,46 @@
+name = "caravancms-api"
+main = "src/index.ts"
+compatibility_date = "2025-07-18"
+compatibility_flags = ["nodejs_compat"]
+
+# Attaches this Worker to api.caravanland.co.nz on the caravanland.co.nz zone.
+# Applied on `wrangler deploy` (needs an authenticated account with DNS:Edit
+# on this zone) — this also provisions the DNS record automatically, no
+# separate manual DNS step needed.
+routes = [
+  { pattern = "api.caravanland.co.nz/*", zone_name = "caravanland.co.nz" }
+]
+# Enables the free *.workers.dev URL alongside the custom domain route above —
+# used for local parity testing while the API token lacks the Zone:Workers
+# Routes permission needed to attach the custom domain automatically.
+workers_dev = true
+
+# Static assets — serves public/addin/* (taskpane.html/js/css, icons) directly,
+# no Worker code involved, matches today's app.UseStaticFiles() with no auth.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "caravancms"
+database_id = "132dd6f3-f98c-479e-8fb6-8c42890a8973"
+
+[[r2_buckets]]
+binding = "DOCUMENTS"
+bucket_name = "caravancms-documents"
+
+[[rules]]
+type = "Text"
+globs = ["**/*.xml"]
+fallthrough = true
+
+[vars]
+# Not secret — the public base URL this Worker is deployed at, used only for
+# the /addin/manifest.xml {{BASE_URL}} substitution. Set the real value after
+# the first deploy (wrangler gives you the workers.dev URL, or your custom domain).
+PUBLIC_BASE_URL = "https://api.caravanland.co.nz"
+
+# API_KEY is NOT set here — it's a secret, set via:
+#   wrangler secret put API_KEY
+# (the current appsettings.json has it committed in plaintext; don't repeat that here)
