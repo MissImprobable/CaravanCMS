@@ -1,6 +1,10 @@
 # Build output
 bin/
 obj/
+publish/
+
+# Installer output (regenerate via installer/*.iss with Inno Setup)
+/CaravanCMS-*-setup.exe
 
 # Visual Studio
 .vs/

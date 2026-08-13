@@ -60,6 +60,11 @@ const Api = {
   },
   removeMessage(conversationId, messageId) {
     return Api.request("DELETE", `/api/conversations/${conversationId}/messages/${messageId}`);
+  },
+  logThread(mailbox, conversationId, customerId, subject, registrationNumber, loggedBy) {
+    return Api.request("POST", "/api/conversations/log-thread", {
+      mailbox, conversationId, customerId, subject, registrationNumber, loggedBy
+    });
   }
 };
 
@@ -68,6 +73,30 @@ function getItemBodyText() {
   return new Promise((resolve, reject) => {
     Office.context.mailbox.item.body.getAsync(Office.CoercionType.Text, {}, result => {
       result.status === Office.AsyncResultStatus.Succeeded ? resolve(result.value) : reject(result.error);
+    });
+  });
+}
+
+// Which mailbox the open item actually lives in — matters because Office.context.mailbox
+// .userProfile.emailAddress always reports the signed-in user's own address, even when
+// they're reading an item in a shared mailbox added as its own entry in Outlook (e.g.
+// info@caravanland.co.nz). getSharedPropertiesAsync only succeeds in that shared/delegate
+// scenario; for a normal personal-mailbox item it fails, and we fall back to the user's own
+// address. Without this, "log entire conversation" on a shared-mailbox thread would ask
+// Graph to search the wrong mailbox and come back empty.
+function getMailboxAddress() {
+  return new Promise(resolve => {
+    const item = Office.context.mailbox.item;
+    if (typeof item.getSharedPropertiesAsync !== "function") {
+      resolve(Office.context.mailbox.userProfile.emailAddress);
+      return;
+    }
+    item.getSharedPropertiesAsync(result => {
+      if (result.status === Office.AsyncResultStatus.Succeeded && result.value && result.value.targetMailbox) {
+        resolve(result.value.targetMailbox);
+      } else {
+        resolve(Office.context.mailbox.userProfile.emailAddress);
+      }
     });
   });
 }
@@ -115,10 +144,14 @@ function getCurrentItemInfo() {
   const toAddresses = (item.to || []).map(r => r.emailAddress).filter(Boolean);
   const direction = isStaffAddress(fromAddress) ? "Outbound" : "Inbound";
   // For an outbound (staff) message, the customer is a recipient, not the sender — match on the
-  // first To address that isn't also a staff address (handles internal CC'd colleagues).
-  const matchAddress = direction === "Outbound"
-    ? (toAddresses.find(a => !isStaffAddress(a)) || toAddresses[0] || "")
-    : fromAddress;
+  // first To address that isn't also a staff address (handles internal CC'd colleagues). If every
+  // recipient is a staff address, this is a purely internal email — there's no external party to
+  // match against at all, so matchAddress is left blank rather than falling back to a colleague's
+  // address (that would risk matching a staff member who also happens to be a customer, wrongly
+  // logging an internal chat as a customer conversation).
+  const externalRecipient = toAddresses.find(a => !isStaffAddress(a));
+  const isInternalOnly = direction === "Outbound" && !externalRecipient && toAddresses.length > 0;
+  const matchAddress = direction === "Outbound" ? (externalRecipient || "") : fromAddress;
   return {
     itemId: item.itemId,
     subject: item.subject || "(No subject)",
@@ -126,6 +159,7 @@ function getCurrentItemInfo() {
     toAddresses,
     direction,
     matchAddress,
+    isInternalOnly,
     conversationId: item.conversationId,
     internetMessageId: item.internetMessageId,
     dateTimeCreated: item.dateTimeCreated
@@ -143,6 +177,7 @@ async function processCurrentItem() {
   const confirmRow = document.getElementById("confirmRow");
   undoRow.classList.add("hidden");
   confirmRow.classList.add("hidden");
+  document.getElementById("threadRow").classList.add("hidden");
   resetManualAttach();
 
   if (!Settings.isConfigured) {
@@ -151,10 +186,20 @@ async function processCurrentItem() {
     return;
   }
 
+  const info = getCurrentItemInfo();
+
+  // Purely internal (caravanland-to-caravanland) mail is never worth capturing — skip the lookup
+  // entirely rather than risk matching a staff member who also happens to be a customer. It's
+  // still reachable via the manual search below if someone genuinely wants to attach it.
+  if (info.isInternalOnly) {
+    statusText.textContent = "Ignored — internal email";
+    statusDetail.innerHTML = `<span class="muted-text">Not addressed to a customer. Use the search below to attach it manually if needed.</span>`;
+    return;
+  }
+
   statusText.textContent = "Checking sender…";
   statusDetail.textContent = "";
 
-  const info = getCurrentItemInfo();
   let customer;
   try {
     customer = await Api.lookupCustomerByEmail(info.matchAddress);
@@ -167,19 +212,57 @@ async function processCurrentItem() {
   if (token !== currentItemToken) return;
 
   if (!customer) {
-    statusText.textContent = "Unknown sender";
-    statusDetail.innerHTML = `<span class="muted-text">${info.matchAddress || "(no address)"} doesn't match a CaravanCMS customer. Use the search below to attach it manually.</span>`;
+    if (info.direction === "Outbound") {
+      statusText.textContent = "Ignored — not a known customer";
+      statusDetail.innerHTML = `<span class="muted-text">${info.matchAddress || "(no address)"} doesn't match a CaravanCMS customer. Use the search below to attach it manually.</span>`;
+    } else {
+      statusText.textContent = "Unknown sender";
+      statusDetail.innerHTML = `<span class="muted-text">${info.matchAddress || "(no address)"} doesn't match a CaravanCMS customer. Use the search below to attach it manually.</span>`;
+    }
     return;
   }
 
   statusText.innerHTML = `${directionBadge(info.direction)} Matched: <span class="success-text">${escapeHtml(customer.name)}</span>`;
   statusDetail.textContent = `${customer.caravanCount} caravan(s) · ${customer.jobCount} job(s) on file`;
 
+  const threadRow = document.getElementById("threadRow");
+  const logThreadButton = document.getElementById("logThreadButton");
+  threadRow.classList.remove("hidden");
+  logThreadButton.disabled = false;
+  logThreadButton.textContent = "Log entire conversation";
+  logThreadButton.onclick = () => logThread(customer, info, token);
+
   if (Settings.autoLog) {
     await logEmail(customer, info, token);
   } else {
     confirmRow.classList.remove("hidden");
     document.getElementById("confirmLogButton").onclick = () => logEmail(customer, info, token);
+  }
+}
+
+// Pulls every message in this conversation from the mailbox via the Worker's Graph-backed
+// endpoint, instead of relying on opening each one individually — this is the "nobody has
+// time to hunt down every related email" shortcut. Safe to click more than once: the backend
+// dedupes by ExternalMessageId, so re-running after new replies arrive only adds what's new.
+async function logThread(customer, info, token) {
+  const statusDetail = document.getElementById("statusDetail");
+  const logThreadButton = document.getElementById("logThreadButton");
+  logThreadButton.disabled = true;
+  logThreadButton.textContent = "Logging conversation…";
+
+  try {
+    const mailbox = await getMailboxAddress();
+    const result = await Api.logThread(mailbox, info.conversationId, customer.id, info.subject, null, Settings.staffName || null);
+    if (token !== currentItemToken) return;
+
+    logThreadButton.textContent = "Log entire conversation";
+    logThreadButton.disabled = false;
+    statusDetail.innerHTML = `<span class="success-text">Conversation logged ✓</span> — ${result.messagesAdded} message(s) added${result.messagesSkipped ? `, ${result.messagesSkipped} already logged` : ""}.`;
+  } catch (err) {
+    if (token !== currentItemToken) return;
+    logThreadButton.textContent = "Log entire conversation";
+    logThreadButton.disabled = false;
+    statusDetail.innerHTML = `<span class="muted-text">Couldn't log conversation: ${escapeHtml(err.message)}</span>`;
   }
 }
 

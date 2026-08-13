@@ -10,7 +10,7 @@ public partial class PromptDialog : Window
 {
     public string? ResultText { get; private set; }
 
-    public PromptDialog(string title, string message, string defaultValue = "")
+    public PromptDialog(string title, string message, string defaultValue = "", string? warning = null)
     {
         InitializeComponent();
         Title = title;
@@ -18,12 +18,18 @@ public partial class PromptDialog : Window
         InputBox.Text = defaultValue;
         InputBox.Focus();
         InputBox.SelectAll();
+
+        if (!string.IsNullOrWhiteSpace(warning))
+        {
+            WarningText.Text = warning;
+            WarningText.Visibility = Visibility.Visible;
+        }
     }
 
     /// <summary>Shows the dialog and returns the entered text, or null if cancelled / left blank.</summary>
-    public static string? Show(Window owner, string title, string message, string defaultValue = "")
+    public static string? Show(Window owner, string title, string message, string defaultValue = "", string? warning = null)
     {
-        PromptDialog dialog = new(title, message, defaultValue) { Owner = owner };
+        PromptDialog dialog = new(title, message, defaultValue, warning) { Owner = owner };
         return dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.ResultText)
             ? dialog.ResultText!.Trim()
             : null;

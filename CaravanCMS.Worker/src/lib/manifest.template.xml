@@ -19,7 +19,7 @@
     xsi:type="MailApp">
 
   <Id>e1ec94e8-367f-474c-8589-cf51f4dfe592</Id>
-  <Version>1.0.1.0</Version>
+  <Version>1.0.2.0</Version>
   <ProviderName>Caravanland</ProviderName>
   <DefaultLocale>en-NZ</DefaultLocale>
   <DisplayName DefaultValue="CaravanCMS"/>
@@ -38,7 +38,7 @@
 
   <Requirements>
     <Sets>
-      <Set Name="Mailbox" MinVersion="1.5"/>
+      <Set Name="Mailbox" MinVersion="1.8"/>
     </Sets>
   </Requirements>
 
@@ -62,7 +62,7 @@
 
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
     <Requirements>
-      <bt:Sets DefaultMinVersion="1.5">
+      <bt:Sets DefaultMinVersion="1.8">
         <bt:Set Name="Mailbox"/>
       </bt:Sets>
     </Requirements>
@@ -125,7 +125,7 @@
     -->
     <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1" xsi:type="VersionOverridesV1_1">
       <Requirements>
-        <bt:Sets DefaultMinVersion="1.5">
+        <bt:Sets DefaultMinVersion="1.8">
           <bt:Set Name="Mailbox"/>
         </bt:Sets>
       </Requirements>

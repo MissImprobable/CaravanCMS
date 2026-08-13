@@ -3,8 +3,16 @@ import type { Env } from "../env";
 import type { ConversationRow, CommunicationLogRow, TagRow } from "../lib/rows";
 import { toConversationDto, toCommunicationLogDto, toTagDto } from "../lib/mappers";
 import { trimQuotedReplyChain } from "../lib/replyChain";
+import { fetchConversationMessages } from "../lib/graph";
 
 const app = new Hono<{ Bindings: Env }>();
+
+// Same staff-domain check as the add-in's taskpane.js isStaffAddress() — used here to
+// classify each Graph-fetched message's direction the same way the single-email flow does.
+const STAFF_EMAIL_DOMAIN = "caravanland.co.nz";
+function isStaffAddress(address: string | null | undefined): boolean {
+  return new RegExp(`@${STAFF_EMAIL_DOMAIN}$`, "i").test((address || "").trim());
+}
 
 async function loadConversationDto(db: D1Database, id: number) {
   const conv = await db.prepare("SELECT * FROM Conversations WHERE Id = ?").bind(id).first<ConversationRow>();
@@ -65,6 +73,109 @@ app.post("/", async (c) => {
 
   const newId = result.meta.last_row_id;
   return c.json(await loadConversationDto(c.env.DB, newId));
+});
+
+/**
+ * Logs an entire email thread in one call — pulls every message in the conversation from
+ * the given mailbox via Microsoft Graph (app-only, Mail.Read) instead of relying on the
+ * add-in opening each message one at a time. Idempotent the same way the single-message
+ * flow is: re-running it after new replies arrive just adds what's new, skipping messages
+ * already logged by ExternalMessageId.
+ */
+app.post("/log-thread", async (c) => {
+  const body = await c.req.json<{
+    mailbox: string;
+    conversationId: string;
+    customerId: number;
+    subject?: string | null;
+    registrationNumber?: string | null;
+    loggedBy?: string | null;
+  }>();
+
+  if (!body.mailbox || !body.conversationId || !body.customerId) {
+    return c.json({ error: "mailbox, conversationId, and customerId are required." }, 400);
+  }
+
+  const customerExists = await c.env.DB.prepare("SELECT 1 FROM Customers WHERE Id = ?")
+    .bind(body.customerId)
+    .first();
+  if (!customerExists) {
+    return c.json({ error: `Customer ${body.customerId} not found.` }, 404);
+  }
+
+  let messages;
+  try {
+    messages = await fetchConversationMessages(c.env, body.mailbox, body.conversationId);
+  } catch (err) {
+    return c.json({ error: `Failed to fetch conversation from Graph: ${(err as Error).message}` }, 502);
+  }
+  if (messages.length === 0) {
+    return c.json({ error: "No messages found for this conversation." }, 404);
+  }
+
+  const now = new Date().toISOString();
+  let conv = await c.env.DB.prepare(
+    "SELECT * FROM Conversations WHERE CustomerId = ? AND ExternalConversationId = ?",
+  )
+    .bind(body.customerId, body.conversationId)
+    .first<ConversationRow>();
+
+  if (!conv) {
+    const result = await c.env.DB.prepare(
+      `INSERT INTO Conversations (CustomerId, RegistrationNumber, Subject, ExternalConversationId, StartedAt, LastActivityAt)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(
+        body.customerId,
+        body.registrationNumber ?? null,
+        body.subject ?? messages[0].subject ?? null,
+        body.conversationId,
+        now,
+        now,
+      )
+      .run();
+    conv = await c.env.DB.prepare("SELECT * FROM Conversations WHERE Id = ?")
+      .bind(result.meta.last_row_id)
+      .first<ConversationRow>();
+  }
+
+  let messagesAdded = 0;
+  let messagesSkipped = 0;
+  let latestActivity = conv!.LastActivityAt;
+
+  for (const m of messages) {
+    if (m.internetMessageId) {
+      const dupe = await c.env.DB.prepare("SELECT 1 FROM CommunicationLogs WHERE ExternalMessageId = ?")
+        .bind(m.internetMessageId)
+        .first();
+      if (dupe) {
+        messagesSkipped++;
+        continue;
+      }
+    }
+
+    const direction = isStaffAddress(m.from) ? "Outbound" : "Inbound";
+    const occurredAt = m.receivedDateTime;
+
+    await c.env.DB.prepare(
+      `INSERT INTO CommunicationLogs (ConversationId, Type, Direction, FromAddress, Body, ExternalMessageId, LoggedBy, OccurredAt, CreatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(conv!.Id, "Email", direction, m.from, m.bodyText.slice(0, 20000), m.internetMessageId, body.loggedBy ?? null, occurredAt, now)
+      .run();
+    messagesAdded++;
+    if (occurredAt > latestActivity) latestActivity = occurredAt;
+  }
+
+  if (latestActivity > conv!.LastActivityAt) {
+    await c.env.DB.prepare("UPDATE Conversations SET LastActivityAt = ? WHERE Id = ?").bind(latestActivity, conv!.Id).run();
+  }
+
+  return c.json({
+    conversation: await loadConversationDto(c.env.DB, conv!.Id),
+    messagesAdded,
+    messagesSkipped,
+  });
 });
 
 /** Port of ConversationsController.Delete — only if the conversation has zero messages. */

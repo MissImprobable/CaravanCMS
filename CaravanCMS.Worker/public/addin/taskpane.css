@@ -120,6 +120,9 @@ label input[type="password"] {
 
 .hidden { display: none !important; }
 
+#threadRow { margin-top: 8px; }
+#threadRow .secondary-button { width: 100%; }
+
 #searchBox {
   width: 100%;
   padding: 6px 8px;

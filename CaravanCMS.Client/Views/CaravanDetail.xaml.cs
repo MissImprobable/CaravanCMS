@@ -14,6 +14,9 @@ public partial class CaravanDetailWindow : Window
     private readonly CaravanViewModel _vm;
     private bool _documentsNewestFirst = true;
 
+    private const string SensitiveDataWarning =
+        "This package contains sensitive customer information, please ensure you are only sending to authorized recipients.";
+
     public CaravanDetailWindow(ApiClient api, CaravanSummaryDto summary)
     {
         InitializeComponent();
@@ -54,7 +57,8 @@ public partial class CaravanDetailWindow : Window
     private async void PackageAndSend_Click(object sender, RoutedEventArgs e)
     {
         string? recipient = PromptDialog.Show(this, "Package and Send",
-            $"Send the complete history for {_vm.Caravan?.RegistrationNumber} to:");
+            $"Send the complete history for {_vm.Caravan?.RegistrationNumber} to:",
+            warning: SensitiveDataWarning);
         if (recipient is null) return;
 
         await _vm.PackageAndSendAsync(recipient);
@@ -68,7 +72,8 @@ public partial class CaravanDetailWindow : Window
         e.Handled = true;
         string documentType = (string)((Button)sender).Tag;
         string? recipient = PromptDialog.Show(this, "Send a Copy",
-            $"Send \"{documentType}\" documents to:");
+            $"Send \"{documentType}\" documents to:",
+            warning: SensitiveDataWarning);
         if (recipient is null) return;
 
         await _vm.SendDocumentTypeCopyAsync(documentType, recipient);
@@ -80,7 +85,8 @@ public partial class CaravanDetailWindow : Window
     {
         ConversationDto conversation = (ConversationDto)((Button)sender).Tag;
         string? recipient = PromptDialog.Show(this, "Send a Copy",
-            $"Send \"{conversation.Subject ?? "this conversation"}\" to:");
+            $"Send \"{conversation.Subject ?? "this conversation"}\" to:",
+            warning: SensitiveDataWarning);
         if (recipient is null) return;
 
         _vm.SendConversationCopy(conversation, recipient);
