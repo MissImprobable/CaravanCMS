@@ -75,7 +75,11 @@ public partial class DocumentReviewViewModel : ObservableObject
             {
                 StatusText = $"Linking {item.Doc.FileName}...";
                 string documentType = DocumentMatcher.InferDocumentType(_rootPath, item.Doc.FilePath);
-                await _api.UploadDocumentAsync(item.Doc.FilePath, item.SelectedCaravan!.RegistrationNumber, documentType, "ManualReview");
+                // sourceFilePath must be passed here (same as DocumentSyncService's auto-link path) — without
+                // it the server falls back to a synthetic "r2://REG/file.jpg" placeholder FilePath instead of
+                // this file's real on-disk path, which breaks the known-paths dedup check on every later scan
+                // and was producing duplicate Documents rows for the same file.
+                await _api.UploadDocumentAsync(item.Doc.FilePath, item.SelectedCaravan!.RegistrationNumber, documentType, "ManualReview", sourceFilePath: item.Doc.FilePath);
                 _reviewStore.RemovePending(item.Doc.FilePath);
                 item.IsResolved = true;
                 linked++;

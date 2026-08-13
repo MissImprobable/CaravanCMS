@@ -102,6 +102,24 @@ app.post("/", async (c) => {
     return c.json({ error: `Caravan ${registrationNumber} not found.` }, 404);
   }
 
+  // Server-side dedup backstop — Admin's own _knownPaths cache is the primary guard against
+  // re-uploading a file it already synced, but that cache is per-process and rebuilt only at
+  // startup, so it can't see uploads another concurrently-running Admin instance just made. This
+  // check closes that gap: if a row already exists for this exact (registrationNumber, filePath),
+  // hand back the existing row instead of creating (and re-uploading the bytes for) a duplicate.
+  // Only meaningful when a real sourceFilePath was sent — without one there's no stable identity
+  // to dedupe against, so every such call still creates a new row, same as before.
+  if (sourceFilePath) {
+    const existing = await c.env.DB.prepare(
+      "SELECT * FROM Documents WHERE RegistrationNumber = ? AND FilePath = ?",
+    )
+      .bind(registrationNumber, sourceFilePath)
+      .first<DocumentRow>();
+    if (existing) {
+      return c.json(toDocumentDto(existing), 200);
+    }
+  }
+
   let fileName = file.name;
   let mimeType = file.type || getMimeType(fileName);
   const now = new Date().toISOString();
